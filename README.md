@@ -40,6 +40,13 @@ A modern, standalone Windows desktop application built with **Python & CustomTki
 
 ### Option A: Double-Click Launcher
 Double-click **`run.bat`** in this folder.
+The launcher creates a local `.venv`, installs dependencies on first launch
+(or when `requirements.txt` changes), and opens the desktop UI together with
+the background scheduler and enabled folder watcher. Python 3.10+ must be
+installed; the first setup requires internet access. No separate backend
+command is needed. Daily publishing is enabled from the Auto-Pilot UI.
+Closing the window keeps services running in the system tray; use the tray's
+**Exit Application** command to stop everything.
 
 ### Option B: Terminal / PowerShell
 ```powershell
