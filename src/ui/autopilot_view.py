@@ -34,8 +34,8 @@ class AutoPilotView(ctk.CTkScrollableFrame):
         self.niche_menu.grid(row=1, column=0, sticky="ew", padx=(0, 12))
         self.voice_menu = ctk.CTkOptionMenu(row, height=44, values=["Ryan (Energetic Male)", "Christopher (Authoritative)", "Jenny (Natural Female)", "Sonia (British Female)"])
         self.voice_menu.grid(row=1, column=1, sticky="ew", padx=(12, 0))
-        self.instant_btn = ctk.CTkButton(gen_card, text="⚡ 1-Click Generate & Publish Short (AI Script, Voice, Video & Upload)", height=48,
-                                         fg_color="#00C853", hover_color="#00B248",
+        self.instant_btn = ctk.CTkButton(gen_card, text="Generate & publish Short", height=48,
+                                         fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
                                          font=ctk.CTkFont(size=14, weight="bold"), command=self._trigger_instant_generation)
         self.instant_btn.pack(fill="x", padx=24, pady=(0, 8))
         ctk.CTkLabel(gen_card, text="Publishes publicly when connected. Otherwise, saves to your queue.",
@@ -52,7 +52,7 @@ class AutoPilotView(ctk.CTkScrollableFrame):
         self.hour_menu.grid(row=1, column=0, sticky="ew", padx=(0, 12))
         self.daily_switch_var = ctk.BooleanVar(value=autopilot.is_active())
         self.daily_switch = ctk.CTkSwitch(row, text="Enable daily publishing", variable=self.daily_switch_var,
-                                          command=self._toggle_daily_autopilot, progress_color=COLORS["secondary_hover"],
+                                          command=self._toggle_daily_autopilot, progress_color=COLORS["accent"],
                                           height=44, font=ctk.CTkFont(size=13))
         self.daily_switch.grid(row=1, column=1, sticky="w", padx=(24, 0))
 

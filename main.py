@@ -82,9 +82,9 @@ class YouTubeAutomatorApp(ctk.CTk):
         self.sidebar.pack_propagate(False)
         brand = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         brand.pack(fill="x", padx=24, pady=(32, 24))
-        ctk.CTkLabel(brand, text="STUDIO / AUTOMATOR", text_color=COLORS["muted"],
+        ctk.CTkLabel(brand, text="●  STUDIO AUTOMATOR", text_color=COLORS["accent"],
                      font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
-        ctk.CTkLabel(brand, text="Create. Publish.",
+        ctk.CTkLabel(brand, text="Creator studio", 
                      font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w", pady=(8, 0))
         ctk.CTkLabel(brand, text="Your content workspace", text_color=COLORS["muted"]).pack(anchor="w")
 
@@ -143,9 +143,9 @@ class YouTubeAutomatorApp(ctk.CTk):
 
         for key, btn in self.nav_btns.items():
             if key == view_key:
-                btn.configure(fg_color=COLORS["raised"], text_color=COLORS["text"], hover_color=COLORS["secondary_hover"])
+                btn.configure(fg_color=COLORS["raised"], text_color=COLORS["text"], hover_color=COLORS["secondary_hover"], border_width=1, border_color=COLORS["border"])
             else:
-                btn.configure(fg_color="transparent", text_color=COLORS["muted"], hover_color=COLORS["raised"])
+                btn.configure(fg_color="transparent", text_color=COLORS["muted"], hover_color=COLORS["raised"], border_width=0)
 
         for key, view in self.views.items():
             if key == view_key:

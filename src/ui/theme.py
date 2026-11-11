@@ -2,15 +2,15 @@
 from pathlib import Path
 import customtkinter as ctk
 
-COLORS = {'bg': '#0F172A',
- 'sidebar': '#111B2E',
- 'surface': '#1B2336',
- 'raised': '#273449',
- 'border': '#475569',
+COLORS = {'bg': '#101114',
+ 'sidebar': '#17181D',
+ 'surface': '#1D1F25',
+ 'raised': '#2B2E37',
+ 'border': '#454954',
  'text': '#F8FAFC',
  'muted': '#A8B6CA',
- 'accent': '#D93642',
- 'accent_hover': '#BD343C',
+ 'accent': '#E94E58',
+ 'accent_hover': '#C83C48',
  'success': '#6EE7B7',
  'warning': '#FCD34D',
  'danger': '#FDA4AF',
