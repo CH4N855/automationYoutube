@@ -118,7 +118,7 @@ def generate_voiceover(text: str, output_path: str, voice: Optional[str] = None)
     return output_path
 
 def create_background_image(width=1080, height=1920, output_path=None) -> str:
-    """Create a dark, aesthetic gradient background for Shorts."""
+    """Create a dark, aesthetic gradient background for Shorts or Long videos."""
     img = Image.new("RGB", (width, height), color=(15, 15, 22))
     draw = ImageDraw.Draw(img)
 
@@ -129,45 +129,81 @@ def create_background_image(width=1080, height=1920, output_path=None) -> str:
         draw.line([(0, y), (width, y)], fill=(r, g, b))
 
     if not output_path:
-        output_path = str(GENERATED_DIR / "bg.png")
+        output_path = str(GENERATED_DIR / f"bg_{width}x{height}.png")
     img.save(output_path)
     return output_path
 
-def create_ai_short(
+def create_ai_video(
     topic_or_niche: Optional[str] = None,
     voice: Optional[str] = None,
     custom_script: Optional[str] = None,
+    format_type: str = "short",
     progress_callback: Optional[Callable[[float, str], None]] = None
 ) -> Dict[str, Any]:
     """
-    Fully automated generation of a 9:16 vertical YouTube Short:
-    1. Selects or formats the script matching the requested niche.
+    Automated generation of YouTube Short (9:16 vertical) or Long-Form Video (16:9 widescreen):
+    1. Selects or formats the script matching the requested niche & format.
     2. Generates realistic AI voiceover with the selected voice via edge-tts.
-    3. Assembles video with MoviePy (or FFmpeg fallback) preserving full narration.
-    4. Generates an eye-catching matching thumbnail.
+    3. Assembles video with burned captions in 9:16 or 16:9.
+    4. Generates an eye-catching matching thumbnail (9:16 or 16:9).
     5. Returns video path and metadata ready for upload!
     """
+    is_short = (str(format_type).lower().strip() == "short")
     timestamp = random.randint(1000, 9999)
-    video_filename = f"ai_short_{timestamp}.mp4"
+    prefix = "ai_short" if is_short else "ai_long"
+    video_filename = f"{prefix}_{timestamp}.mp4"
     audio_path = str(GENERATED_DIR / f"audio_{timestamp}.mp3")
     video_path = str(GENERATED_DIR / video_filename)
 
-    # 1. Prepare Script matching niche
-    if custom_script:
-        script_text = custom_script
-        title = f"{topic_or_niche or 'Did You Know?'} #Shorts"
+    template = select_template_for_niche(topic_or_niche)
+
+    if is_short:
+        width, height = 1080, 1920
+        aspect = "9:16"
+        sub_style = "FontName=Arial,FontSize=20,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=300"
+        thumb_sub = "VIRAL SHORTS"
+        if custom_script:
+            script_text = custom_script
+            title = f"{topic_or_niche or 'Did You Know?'} #Shorts"
+        else:
+            script_text = f"{template['hook']}. First: {template['points'][0]}. Next: {template['points'][1]}. Finally: {template['points'][2]}. Follow for more daily facts!"
+            title = f"{template['hook'].replace('!', '')} 🤯 #Shorts"
+        desc = f"{script_text}\n\n🔔 Subscribe for daily mind-blowing shorts!\n#Shorts #Facts #Viral #Learn"
+        tags = ["shorts", "facts", "viral", "didyouknow", "motivation", "daily"]
     else:
-        template = select_template_for_niche(topic_or_niche)
-        script_text = f"{template['hook']}. First: {template['points'][0]}. Next: {template['points'][1]}. Finally: {template['points'][2]}. Follow for more daily facts!"
-        title = f"{template['hook'].replace('!', '')} 🤯 #Shorts"
+        width, height = 1920, 1080
+        aspect = "16:9"
+        sub_style = "FontName=Arial,FontSize=26,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=90"
+        thumb_sub = "MUST WATCH"
+        if custom_script:
+            script_text = custom_script
+            title = f"{topic_or_niche or 'Did You Know?'} - Full Guide"
+        else:
+            script_text = (
+                f"Welcome to today's deep dive into {template['niche']}. {template['hook']} "
+                f"Let's explore our first key insight: {template['points'][0]} "
+                f"Moving on to our second crucial fact: {template['points'][1]} "
+                f"And finally, the most extraordinary point of all: {template['points'][2]} "
+                f"Thank you for watching this full episode. Make sure to hit subscribe and leave a comment below with your thoughts!"
+            )
+            title = f"{template['hook'].replace('!', '')} (Full Episode)"
+        desc = (
+            f"{script_text}\n\n"
+            f"📌 CHAPTERS / TIMESTAMPS:\n"
+            f"0:00 - Introduction & Hook\n"
+            f"0:15 - Point 1: Deep Dive\n"
+            f"0:45 - Point 2: Key Analysis\n"
+            f"1:15 - Point 3: The Final Takeaway\n\n"
+            f"🔔 Subscribe to our channel for more comprehensive long-form videos!\n"
+            f"#Documentary #Facts #Learning #Education"
+        )
+        tags = ["youtube", "facts", "documentary", "guide", "education", "deep dive", "learning"]
 
     if progress_callback:
         progress_callback(0.15, "Generating AI Voiceover...")
 
-    # 2. Generate Voiceover Audio with selected voice
     generate_voiceover(script_text, audio_path, voice=voice)
 
-    # 2.5 Generate Animated Subtitles with Whisper
     srt_path = None
     if progress_callback:
         progress_callback(0.30, "Generating Animated Subtitles...")
@@ -178,13 +214,13 @@ def create_ai_short(
         print(f"Subtitle notice: {e}")
 
     if progress_callback:
-        progress_callback(0.50, "Rendering 9:16 Vertical Video...")
+        mode_label = "9:16 Vertical Short" if is_short else "16:9 Widescreen Video"
+        progress_callback(0.50, f"Rendering {mode_label}...")
 
-    # 3. Create Video with direct FFmpeg stream muxing & burned subtitles
     try:
         import imageio_ffmpeg
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-        bg_path = create_background_image()
+        bg_path = create_background_image(width=width, height=height)
 
         cmd = [
             ffmpeg_exe, "-y",
@@ -195,8 +231,7 @@ def create_ai_short(
 
         if srt_path and os.path.exists(srt_path):
             srt_filename = os.path.basename(srt_path)
-            sub_filter = f"subtitles={srt_filename}:force_style='FontName=Arial,FontSize=20,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=300'"
-            cmd.extend(["-vf", sub_filter])
+            cmd.extend(["-vf", f"subtitles={srt_filename}:force_style='{sub_style}'"])
 
         cmd.extend([
             "-c:v", "libx264",
@@ -214,20 +249,35 @@ def create_ai_short(
         raise RuntimeError(f"Video rendering failed: {e}")
 
     if progress_callback:
-        progress_callback(0.90, "Creating Thumbnail...")
+        progress_callback(0.90, f"Creating {aspect} Custom Thumbnail...")
 
     from src.thumbnail_generator import generate_youtube_thumbnail
-    thumb_path = generate_youtube_thumbnail(title=title, subtitle="VIRAL SHORTS", aspect_ratio="9:16")
+    thumb_path = generate_youtube_thumbnail(title=title, subtitle=thumb_sub, aspect_ratio=aspect)
 
     if progress_callback:
-        progress_callback(1.0, "Short Generated Successfully!")
+        progress_callback(1.0, "Video Generated Successfully!")
 
     return {
         "video_path": video_path,
         "thumbnail_path": thumb_path,
         "title": title[:100],
-        "description": f"{script_text}\n\n🔔 Subscribe for daily mind-blowing shorts!\n#Shorts #Facts #Viral #Learn",
-        "tags": ["shorts", "facts", "viral", "didyouknow", "motivation", "daily"],
-        "category_id": "27",  # Education
-        "is_short": True
+        "description": desc,
+        "tags": tags,
+        "category_id": "27",
+        "is_short": is_short
     }
+
+def create_ai_short(
+    topic_or_niche: Optional[str] = None,
+    voice: Optional[str] = None,
+    custom_script: Optional[str] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None
+) -> Dict[str, Any]:
+    """Backwards-compatible helper for generating 9:16 Shorts."""
+    return create_ai_video(
+        topic_or_niche=topic_or_niche,
+        voice=voice,
+        custom_script=custom_script,
+        format_type="short",
+        progress_callback=progress_callback
+    )

@@ -86,10 +86,12 @@ class FolderWatcher:
 
         settings = load_settings()
         footer = settings.get("default_description_footer", "").strip()
+        fmt_pref = settings.get("watch_folder_format", "Auto-Detect").lower()
+        force_fmt = "short" if "short" in fmt_pref else ("long" if "long" in fmt_pref else None)
 
         try:
             # Automatically read and analyze video speech/content for title, description & hashtags
-            meta = auto_generate_video_metadata(video_path)
+            meta = auto_generate_video_metadata(video_path, force_format=force_fmt)
             title = meta.get("title")
             base_desc = meta.get("description", "")
             description = f"{base_desc}\n\n{footer}".strip() if footer else base_desc

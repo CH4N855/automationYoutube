@@ -123,7 +123,8 @@ def extract_keywords(text: str, top_n: int = 15) -> List[str]:
 
 def auto_generate_video_metadata(
     video_path: str,
-    progress_callback: Optional[Any] = None
+    progress_callback: Optional[Any] = None,
+    force_format: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Automated end-to-end video analysis:
@@ -140,14 +141,19 @@ def auto_generate_video_metadata(
     if progress_callback:
         progress_callback(0.15, "Inspecting video format & dimensions...")
 
-    # Determine if it's a Short
+    # Determine if it's a Short or Long video
     is_short = False
-    try:
-        from src.youtube_uploader import get_video_info
-        info = get_video_info(video_path)
-        is_short = info.get("is_short", False)
-    except Exception:
-        pass
+    if force_format == "short":
+        is_short = True
+    elif force_format == "long":
+        is_short = False
+    else:
+        try:
+            from src.youtube_uploader import get_video_info
+            info = get_video_info(video_path)
+            is_short = info.get("is_short", False)
+        except Exception:
+            pass
 
     companion = read_accompanying_metadata(video_path)
     transcript = None
@@ -202,9 +208,11 @@ def auto_generate_video_metadata(
         else:
             title = title[0].upper() + title[1:] + "?"
 
-        if is_short and "#Shorts" not in title:
-            title = f"{title[:80]} #Shorts"
+        if is_short:
+            if "#Shorts" not in title:
+                title = f"{title[:80]} #Shorts"
         else:
+            title = re.sub(r'#shorts?\b', '', title, flags=re.IGNORECASE).strip()
             title = title[:95]
 
         # 2. Category
@@ -216,7 +224,7 @@ def auto_generate_video_metadata(
             hashtags.append("#Shorts")
         for kw in keywords[:6]:
             tag = f"#{kw.capitalize()}"
-            if tag not in hashtags:
+            if tag not in hashtags and tag.lower() != "#shorts":
                 hashtags.append(tag)
         if "#Facts" not in hashtags and ("facts" in transcript.lower() or "did you know" in transcript.lower()):
             hashtags.append("#Facts")
@@ -228,7 +236,7 @@ def auto_generate_video_metadata(
         if is_short:
             tags.append("shorts")
         for kw in keywords:
-            if kw not in tags:
+            if kw not in tags and kw.lower() != "shorts":
                 tags.append(kw)
         if clean_fallback.lower() not in tags:
             tags.insert(0, clean_fallback.lower())

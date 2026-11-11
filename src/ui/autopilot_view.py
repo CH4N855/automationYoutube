@@ -23,18 +23,21 @@ class AutoPilotView(ctk.CTkScrollableFrame):
         ctk.CTkLabel(header, text="Turn an idea into your next Short. Keep your channel moving.",
                      text_color=COLORS["muted"], font=ctk.CTkFont(size=14)).pack(anchor="w")
 
-        gen_card = self._card("01 / CREATE", "Make your next Short",
-                              "Choose a topic and voice. We will create a script, narration, and vertical video.")
+        gen_card = self._card("01 / CREATE", "Make your next video",
+                              "Choose a topic, voice, and format. We will create a script, narration, and video.")
         row = ctk.CTkFrame(gen_card, fg_color="transparent")
         row.pack(fill="x", padx=24, pady=(8, 16))
-        row.grid_columnconfigure((0, 1), weight=1, uniform="fields")
-        for col, label in enumerate(("Content niche", "Narration voice")):
+        row.grid_columnconfigure((0, 1, 2), weight=1, uniform="fields")
+        for col, label in enumerate(("Content niche", "Narration voice", "Video format")):
             ctk.CTkLabel(row, text=label, font=ctk.CTkFont(size=13, weight="bold")).grid(row=0, column=col, sticky="w", pady=(0, 8))
         self.niche_menu = ctk.CTkOptionMenu(row, height=44, values=["Space & Science", "Psychology & Motivation", "Unbelievable History", "Productivity & Life Hacks", "Random Viral Facts"])
-        self.niche_menu.grid(row=1, column=0, sticky="ew", padx=(0, 12))
+        self.niche_menu.grid(row=1, column=0, sticky="ew", padx=(0, 8))
         self.voice_menu = ctk.CTkOptionMenu(row, height=44, values=["Ryan (Energetic Male)", "Christopher (Authoritative)", "Jenny (Natural Female)", "Sonia (British Female)"])
-        self.voice_menu.grid(row=1, column=1, sticky="ew", padx=(12, 0))
-        self.instant_btn = ctk.CTkButton(gen_card, text="Generate & publish Short", height=48,
+        self.voice_menu.grid(row=1, column=1, sticky="ew", padx=(4, 8))
+        self.format_menu = ctk.CTkOptionMenu(row, height=44, values=["YouTube Short (9:16 Vertical)", "YouTube Long Video (16:9 Widescreen)"], command=self._on_format_changed)
+        self.format_menu.grid(row=1, column=2, sticky="ew", padx=(8, 0))
+
+        self.instant_btn = ctk.CTkButton(gen_card, text="⚡ Generate & publish Short", height=48,
                                          fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
                                          font=ctk.CTkFont(size=14, weight="bold"), command=self._trigger_instant_generation)
         self.instant_btn.pack(fill="x", padx=24, pady=(0, 8))
@@ -73,16 +76,28 @@ class AutoPilotView(ctk.CTkScrollableFrame):
                      wraplength=680, font=ctk.CTkFont(size=13)).pack(anchor="w", padx=24, pady=(4, 12))
         return card
 
+    def _on_format_changed(self, choice: str):
+        is_short = "short" in choice.lower()
+        btn_text = "⚡ Generate & publish Short" if is_short else "⚡ Generate & publish Long Video"
+        self.instant_btn.configure(text=btn_text)
+
     def _trigger_instant_generation(self):
         niche, voice = self.niche_menu.get(), self.voice_menu.get()
-        self.instant_btn.configure(state="disabled", text="Creating your Short...")
+        format_choice = self.format_menu.get()
+        format_type = "short" if "short" in format_choice.lower() else "long"
+        label = "Short" if format_type == "short" else "Long Video"
+
+        self.instant_btn.configure(state="disabled", text=f"Creating your {label}...")
         self.niche_menu.configure(state="disabled")
         self.voice_menu.configure(state="disabled")
+        self.format_menu.configure(state="disabled")
 
         def complete(res):
-            self.instant_btn.configure(state="normal", text="Generate & publish Short")
+            btn_text = "⚡ Generate & publish Short" if format_type == "short" else "⚡ Generate & publish Long Video"
+            self.instant_btn.configure(state="normal", text=btn_text)
             self.niche_menu.configure(state="normal")
             self.voice_menu.configure(state="normal")
+            self.format_menu.configure(state="normal")
             if res.get("success"):
                 if res.get("url"):
                     messagebox.showinfo("Published", f"Video published to YouTube!\n\nTitle: {res.get('title')}\nURL: {res.get('url')}")
@@ -95,7 +110,7 @@ class AutoPilotView(ctk.CTkScrollableFrame):
 
         def worker():
             try:
-                res = autopilot.generate_and_post_short_now(niche=niche, voice=voice)
+                res = autopilot.generate_and_post_video_now(niche=niche, voice=voice, format_type=format_type)
             except Exception as exc:
                 res = {"success": False, "error": str(exc)}
             self.after(0, lambda: complete(res))
@@ -111,7 +126,8 @@ class AutoPilotView(ctk.CTkScrollableFrame):
                 hour = 18
             niche = self.niche_menu.get()
             voice = self.voice_menu.get()
-            autopilot.start_daily_automation(post_hour=hour, niche=niche, voice=voice)
+            format_type = "short" if "short" in self.format_menu.get().lower() else "long"
+            autopilot.start_daily_automation(post_hour=hour, niche=niche, voice=voice, format_type=format_type)
         else:
             autopilot.stop_daily_automation()
 

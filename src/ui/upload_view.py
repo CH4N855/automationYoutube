@@ -103,6 +103,20 @@ class UploadView(ctk.CTkScrollableFrame):
         )
         # Hidden by default
 
+        # Target Post Format Selector (Short vs Long Video)
+        format_frame = ctk.CTkFrame(self.video_info_frame, fg_color="transparent")
+        format_frame.pack(fill="x", padx=10, pady=(4, 6))
+        ctk.CTkLabel(format_frame, text="Format:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+        self.upload_format_menu = ctk.CTkOptionMenu(
+            format_frame,
+            values=["Auto-Detect", "YouTube Short (<60s)", "YouTube Long Video"],
+            height=30,
+            command=self._on_upload_format_selected
+        )
+        def_fmt = load_settings().get("default_video_format", "Auto-Detect")
+        self.upload_format_menu.set(def_fmt)
+        self.upload_format_menu.pack(side="right", fill="x", expand=True, padx=(8, 0))
+
         # Auto-Detect Title, Description & Hashtags Button
         self.auto_meta_btn = ctk.CTkButton(
             self.video_info_frame,
@@ -355,11 +369,49 @@ class UploadView(ctk.CTkScrollableFrame):
             clean_title = os.path.splitext(info['filename'])[0].replace("_", " ").title()
             self.title_entry.insert(0, clean_title[:100])
 
-        # Show / hide Shorts badge
-        if info['is_short']:
-            self.shorts_badge.pack(anchor="w", padx=10, pady=(0, 8))
+        # Show / hide Shorts badge based on format menu or video info
+        fmt_choice = self.upload_format_menu.get().lower()
+        if "short" in fmt_choice:
+            self.shorts_badge.configure(text="YouTube Short (<60s & Vertical)", fg_color=COLORS["danger_bg"], text_color=COLORS["danger"])
+            self.shorts_badge.pack(anchor="w", padx=10, pady=(0, 6))
+        elif "long" in fmt_choice:
+            self.shorts_badge.configure(text="YouTube Long Video (16:9)", fg_color=COLORS["raised"], text_color=COLORS["text"])
+            self.shorts_badge.pack(anchor="w", padx=10, pady=(0, 6))
+        elif info['is_short']:
+            self.shorts_badge.configure(text="YouTube Short (<60s & Vertical)", fg_color=COLORS["danger_bg"], text_color=COLORS["danger"])
+            self.shorts_badge.pack(anchor="w", padx=10, pady=(0, 6))
         else:
             self.shorts_badge.pack_forget()
+
+    def _on_upload_format_selected(self, choice: str):
+        import re
+        if "short" in choice.lower():
+            self.shorts_badge.configure(text="YouTube Short (<60s & Vertical)", fg_color=COLORS["danger_bg"], text_color=COLORS["danger"])
+            self.shorts_badge.pack(anchor="w", padx=10, pady=(0, 6))
+            cur_title = self.title_entry.get().strip()
+            if cur_title and "#Shorts" not in cur_title:
+                self.title_entry.delete(0, "end")
+                self.title_entry.insert(0, f"{cur_title} #Shorts")
+            self._auto_generate_thumbnail()
+        elif "long" in choice.lower():
+            self.shorts_badge.configure(text="YouTube Long Video (16:9)", fg_color=COLORS["raised"], text_color=COLORS["text"])
+            self.shorts_badge.pack(anchor="w", padx=10, pady=(0, 6))
+            cur_title = self.title_entry.get().strip()
+            if "#Shorts" in cur_title or "#shorts" in cur_title:
+                clean_title = re.sub(r'#shorts?\b', '', cur_title, flags=re.IGNORECASE).strip()
+                self.title_entry.delete(0, "end")
+                self.title_entry.insert(0, clean_title)
+            self._auto_generate_thumbnail()
+        else:
+            if self.selected_video_path and os.path.exists(self.selected_video_path):
+                info = get_video_info(self.selected_video_path)
+                if info.get("is_short"):
+                    self.shorts_badge.configure(text="YouTube Short (<60s & Vertical)", fg_color=COLORS["danger_bg"], text_color=COLORS["danger"])
+                    self.shorts_badge.pack(anchor="w", padx=10, pady=(0, 6))
+                else:
+                    self.shorts_badge.pack_forget()
+            else:
+                self.shorts_badge.pack_forget()
 
     def _choose_video(self):
         file_path = filedialog.askopenfilename(
@@ -385,8 +437,15 @@ class UploadView(ctk.CTkScrollableFrame):
 
         def worker():
             try:
+                force_fmt = None
+                fmt_choice = self.upload_format_menu.get().lower()
+                if "short" in fmt_choice:
+                    force_fmt = "short"
+                elif "long" in fmt_choice:
+                    force_fmt = "long"
+
                 from src.metadata_generator import auto_generate_video_metadata
-                meta = auto_generate_video_metadata(self.selected_video_path)
+                meta = auto_generate_video_metadata(self.selected_video_path, force_format=force_fmt)
 
                 def update_ui():
                     if meta.get("title"):
@@ -451,8 +510,15 @@ class UploadView(ctk.CTkScrollableFrame):
                 self.after(0, lambda: self.status_lbl.configure(text="Step 1/3: Analyzing speech & generating viral metadata...", text_color=COLORS["warning"]))
                 self.after(0, lambda: self.prog_bar.set(0.15))
 
+                force_fmt = None
+                fmt_choice = self.upload_format_menu.get().lower()
+                if "short" in fmt_choice:
+                    force_fmt = "short"
+                elif "long" in fmt_choice:
+                    force_fmt = "long"
+
                 from src.metadata_generator import auto_generate_video_metadata
-                meta = auto_generate_video_metadata(self.selected_video_path)
+                meta = auto_generate_video_metadata(self.selected_video_path, force_format=force_fmt)
 
                 title = meta.get("title") or self.title_entry.get().strip()
                 if not title:
@@ -570,7 +636,13 @@ class UploadView(ctk.CTkScrollableFrame):
         if not title:
             title = "Awesome Video"
 
-        is_short = self.shorts_badge.winfo_ismapped()
+        fmt_choice = self.upload_format_menu.get().lower()
+        if "short" in fmt_choice:
+            is_short = True
+        elif "long" in fmt_choice:
+            is_short = False
+        else:
+            is_short = self.shorts_badge.winfo_ismapped()
         aspect = "9:16" if is_short else "16:9"
 
         from src.thumbnail_generator import generate_youtube_thumbnail

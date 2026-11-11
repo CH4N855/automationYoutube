@@ -55,23 +55,29 @@ class SettingsView(ctk.CTkScrollableFrame):
 
         settings = load_settings()
 
-        # Category & Privacy
+        # Category, Privacy & Default Format
         row_opts = ctk.CTkFrame(presets_card, fg_color="transparent")
         row_opts.pack(fill="x", padx=15, pady=5)
         row_opts.grid_columnconfigure(0, weight=1)
         row_opts.grid_columnconfigure(1, weight=1)
+        row_opts.grid_columnconfigure(2, weight=1)
 
         ctk.CTkLabel(row_opts, text="Default Category", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w")
         cat_names = list(config.YOUTUBE_CATEGORIES.values())
         cur_cat = config.YOUTUBE_CATEGORIES.get(settings.get("default_category_id", "22"), "People & Blogs")
         self.def_cat_menu = ctk.CTkOptionMenu(row_opts, values=cat_names, height=40)
         self.def_cat_menu.set(cur_cat)
-        self.def_cat_menu.grid(row=1, column=0, sticky="ew", padx=(0, 5))
+        self.def_cat_menu.grid(row=1, column=0, sticky="ew", padx=(0, 4))
 
         ctk.CTkLabel(row_opts, text="Default Privacy", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=1, sticky="w")
         self.def_priv_menu = ctk.CTkOptionMenu(row_opts, values=["public", "unlisted", "private"], height=40)
         self.def_priv_menu.set(settings.get("default_privacy", "public"))
-        self.def_priv_menu.grid(row=1, column=1, sticky="ew", padx=(5, 0))
+        self.def_priv_menu.grid(row=1, column=1, sticky="ew", padx=(4, 4))
+
+        ctk.CTkLabel(row_opts, text="Default Format", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=2, sticky="w")
+        self.def_fmt_menu = ctk.CTkOptionMenu(row_opts, values=["Auto-Detect", "YouTube Shorts (<60s)", "YouTube Long Video"], height=40)
+        self.def_fmt_menu.set(settings.get("default_video_format", "Auto-Detect"))
+        self.def_fmt_menu.grid(row=1, column=2, sticky="ew", padx=(4, 0))
 
         # Default Tags
         ctk.CTkLabel(presets_card, text="Default Tags (comma separated)", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=15, pady=(10, 2))
@@ -229,6 +235,7 @@ class SettingsView(ctk.CTkScrollableFrame):
         settings.update({
             "default_category_id": cat_id,
             "default_privacy": priv,
+            "default_video_format": self.def_fmt_menu.get(),
             "default_tags": tags,
             "default_description_footer": footer,
             "default_made_for_kids": kids

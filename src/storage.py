@@ -125,8 +125,10 @@ DEFAULT_SETTINGS = {
     "default_description_footer": "\n\n🔔 Subscribe for more updates!\n👍 Like and share if you found this helpful.",
     "batch_interval_hours": 24,
     "default_made_for_kids": False,
+    "default_video_format": "Auto-Detect",
     "watch_folder_enabled": True,
     "watch_folder_auto_upload": True,
+    "watch_folder_format": "Auto-Detect",
     "watch_folder_path": str(config.WATCH_DIR),
     "auto_scheduler_enabled": True
 }

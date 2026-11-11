@@ -98,7 +98,20 @@ class FolderView(ctk.CTkFrame):
             command=self._toggle_auto_upload,
             progress_color=COLORS["success"]
         )
-        self.auto_upload_switch.pack(anchor="w", padx=15, pady=(0, 15))
+        self.auto_upload_switch.pack(anchor="w", padx=15, pady=(0, 10))
+
+        # Target Format Selector for Folder
+        format_row = ctk.CTkFrame(card, fg_color="transparent")
+        format_row.pack(fill="x", padx=15, pady=(0, 15))
+        ctk.CTkLabel(format_row, text="Target Format for Videos:", font=ctk.CTkFont(size=13, weight="bold")).pack(side="left")
+        self.folder_format_menu = ctk.CTkOptionMenu(
+            format_row,
+            values=["Auto-Detect", "Always YouTube Short (<60s)", "Always Long Video (16:9)"],
+            command=self._on_folder_format_change,
+            height=34
+        )
+        self.folder_format_menu.set(settings.get("watch_folder_format", "Auto-Detect"))
+        self.folder_format_menu.pack(side="right")
 
         # Explanation box
         info_box = ctk.CTkFrame(card, fg_color=COLORS["bg"], corner_radius=8)
@@ -141,6 +154,12 @@ class FolderView(ctk.CTkFrame):
         else:
             os.makedirs(path, exist_ok=True)
             os.startfile(path)
+
+    def _on_folder_format_change(self, choice: str):
+        settings = load_settings()
+        settings["watch_folder_format"] = choice
+        save_settings(settings)
+        self.log_box.insert("end", f" Target format for watch folder set to: {choice}\n")
 
     def _toggle_auto_upload(self):
         settings = load_settings()
