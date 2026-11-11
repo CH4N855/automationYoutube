@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import config
 from src.youtube_auth import is_authenticated, get_channel_info
-from src.storage import load_queue
+from src.storage import load_queue, load_settings
 from src.scheduler import scheduler
 from src.folder_watcher import folder_watcher
 
@@ -63,6 +63,11 @@ class YouTubeAutomatorApp(ctk.CTk):
         # Start Background Scheduler Daemon (checks queue every 30s)
         scheduler.start(poll_seconds=30)
         scheduler.set_change_callback(self._on_queue_data_changed)
+
+        # Start Folder Watcher daemon if enabled
+        settings = load_settings()
+        if settings.get("watch_folder_enabled", True):
+            folder_watcher.start(settings.get("watch_folder_path", str(config.WATCH_DIR)))
 
         # Setup Windows System Tray
         self._setup_system_tray()
