@@ -33,7 +33,7 @@ def is_safe_path(filepath: str) -> bool:
     """Ensure no credential, token, or media paths are staged or committed."""
     f_lower = filepath.replace("\\", "/").lower()
     path = PurePosixPath(f_lower)
-    if not f_lower or path.is_absolute() or ".." in path.parts or ":" in f_lower:
+    if not path.parts or path.is_absolute() or ".." in path.parts or ":" in f_lower:
         return False
     if path.suffix in {".mp4", ".mov", ".mp3", ".wav", ".mkv", ".avi", ".webm", ".srt"}:
         return False
@@ -89,9 +89,9 @@ class GitAutoPushAgent:
                     entries.append((status_code, file_rel))
                 if "R" in status_code or "C" in status_code:
                     # In -z output the destination is first, followed by the source.
-                    source = next(records, "")
-                    if source:
-                        entries.append((status_code, source))
+                    # The source of a staged rename has already been removed
+                    # from the index, so trying to add it again would fail.
+                    next(records, "")
         return entries
 
     def push_pending_changes(self):
