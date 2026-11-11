@@ -103,6 +103,18 @@ class UploadView(ctk.CTkScrollableFrame):
         )
         # Hidden by default
 
+        # Auto-Detect Title, Description & Hashtags Button
+        self.auto_meta_btn = ctk.CTkButton(
+            self.video_info_frame,
+            text="✨ Auto-Detect Title, Desc & Tags",
+            command=self._auto_detect_metadata,
+            fg_color=COLORS["accent"],
+            hover_color=COLORS["accent_hover"],
+            height=32,
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.auto_meta_btn.pack(fill="x", padx=10, pady=(4, 8))
+
         # Thumbnail Section
         ctk.CTkLabel(
             left_col,
@@ -341,6 +353,60 @@ class UploadView(ctk.CTkScrollableFrame):
                 self.shorts_badge.pack(anchor="w", padx=10, pady=(0, 8))
             else:
                 self.shorts_badge.pack_forget()
+
+            # Automatically analyze video speech and populate Title, Description & Hashtags
+            self.after(100, self._auto_detect_metadata)
+
+    def _auto_detect_metadata(self):
+        """Read and transcribe video file automatically to detect Title, Description and Hashtags."""
+        if not self.selected_video_path or not os.path.exists(self.selected_video_path):
+            messagebox.showinfo("Notice", "Please select a video file first.")
+            return
+
+        self.auto_meta_btn.configure(state="disabled", text="✨ Analyzing Speech...")
+        self.status_lbl.configure(
+            text="Reading video & analyzing audio for Title, Description & Hashtags...",
+            text_color=COLORS["warning"]
+        )
+
+        def worker():
+            try:
+                from src.metadata_generator import auto_generate_video_metadata
+                meta = auto_generate_video_metadata(self.selected_video_path)
+
+                def update_ui():
+                    if meta.get("title"):
+                        self.title_entry.delete(0, "end")
+                        self.title_entry.insert(0, meta["title"])
+
+                    if meta.get("description"):
+                        self.desc_textbox.delete("1.0", "end")
+                        self.desc_textbox.insert("1.0", meta["description"])
+
+                    if meta.get("tags_csv"):
+                        self.tags_entry.delete(0, "end")
+                        self.tags_entry.insert(0, meta["tags_csv"])
+
+                    if meta.get("category_id"):
+                        cat_name = config.YOUTUBE_CATEGORIES.get(meta["category_id"])
+                        if cat_name:
+                            self.cat_menu.set(cat_name)
+
+                    source_name = meta.get("source", "video").replace("_", " ").capitalize()
+                    self.status_lbl.configure(
+                        text=f"✨ Title, Description & Hashtags auto-generated from {source_name}!",
+                        text_color=COLORS["success"]
+                    )
+                    self.auto_meta_btn.configure(state="normal", text="✨ Auto-Detect Title, Desc & Tags")
+
+                self.after(0, update_ui)
+            except Exception as e:
+                def on_err():
+                    self.status_lbl.configure(text=f"Auto-metadata notice: {e}", text_color=COLORS["muted"])
+                    self.auto_meta_btn.configure(state="normal", text="✨ Auto-Detect Title, Desc & Tags")
+                self.after(0, on_err)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _choose_thumbnail(self):
         file_path = filedialog.askopenfilename(

@@ -82,16 +82,33 @@ class FolderWatcher:
             time.sleep(interval)
 
     def _process_new_video(self, video_path: str):
+        from src.metadata_generator import auto_generate_video_metadata
+
         settings = load_settings()
-        clean_name = os.path.splitext(os.path.basename(video_path))[0]
-        title = clean_name.replace("_", " ").replace("-", " ").title()
+        footer = settings.get("default_description_footer", "").strip()
+
+        try:
+            # Automatically read and analyze video speech/content for title, description & hashtags
+            meta = auto_generate_video_metadata(video_path)
+            title = meta.get("title")
+            base_desc = meta.get("description", "")
+            description = f"{base_desc}\n\n{footer}".strip() if footer else base_desc
+            tags = meta.get("tags", settings.get("default_tags", ["automation"]))
+            category_id = meta.get("category_id", settings.get("default_category_id", "22"))
+        except Exception as e:
+            print(f"Metadata auto-generation notice: {e}")
+            clean_name = os.path.splitext(os.path.basename(video_path))[0]
+            title = clean_name.replace("_", " ").replace("-", " ").title()
+            description = f"Auto-uploaded from Watch Folder.\n\n{footer}".strip()
+            tags = settings.get("default_tags", ["automation"])
+            category_id = settings.get("default_category_id", "22")
 
         add_to_queue(
             video_path=video_path,
             title=title,
-            description=f"Auto-uploaded from Watch Folder.{settings.get('default_description_footer', '')}",
-            tags=settings.get("default_tags", ["automation"]),
-            category_id=settings.get("default_category_id", "22"),
+            description=description,
+            tags=tags,
+            category_id=category_id,
             privacy_status=settings.get("default_privacy", "public"),
             made_for_kids=settings.get("default_made_for_kids", False)
         )
