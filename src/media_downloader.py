@@ -4,6 +4,33 @@ from urllib.parse import urlparse
 import subprocess
 import tempfile
 import uuid
+import time
+
+
+def extract_with_retries(downloader, url, progress=None):
+    """Bounded automatic recovery for temporary site/network failures."""
+    from yt_dlp.utils import DownloadError
+    for attempt in range(3):
+        try:
+            return downloader.extract_info(url, download=True)
+        except DownloadError as exc:
+            message = str(exc)
+            transient = any(text in message.lower() for text in (
+                "403", "429", "timed out", "timeout", "connection", "502", "503",
+                "unexpected response"))
+            if not transient:
+                raise
+            if attempt == 2:
+                raise RuntimeError(
+                    "The website still refused the download after 3 automatic attempts. "
+                    "Open the link in your browser to check whether it requires login "
+                    "or verification, or is unavailable. No video was saved."
+                ) from exc
+            delay = 2 ** (attempt + 1)
+            if progress:
+                progress(None, f"Website request failed. Automatically retrying in {delay}s "
+                         f"(attempt {attempt + 2}/3)...")
+            time.sleep(delay)
 
 
 def download_video(url, destination, progress=None):
@@ -37,6 +64,9 @@ def download_video(url, destination, progress=None):
         "progress_hooks": [hook],
         "quiet": True,
         "no_color": True,
+        "socket_timeout": 20,
+        "retries": 2,
+        "fragment_retries": 2,
         "no_warnings": True,
     }
     if parsed.hostname == "tiktok.com" or (parsed.hostname or "").endswith(".tiktok.com"):
@@ -49,7 +79,7 @@ def download_video(url, destination, progress=None):
     with tempfile.TemporaryDirectory(prefix="studio-download-") as temp:
         options["outtmpl"] = str(Path(temp) / "source.%(ext)s")
         with yt_dlp.YoutubeDL(options) as downloader:
-            info = downloader.extract_info(url.strip(), download=True)
+            info = extract_with_retries(downloader, url.strip(), progress)
             if not info:
                 raise RuntimeError("The site did not return video information.")
         sources = [p for p in Path(temp).glob("source.*") if p.suffix.lower() not in (".part", ".ytdl")]
