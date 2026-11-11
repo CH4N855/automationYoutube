@@ -78,10 +78,19 @@ def download_video(url, destination, progress=None):
         pass
     with tempfile.TemporaryDirectory(prefix="studio-download-") as temp:
         options["outtmpl"] = str(Path(temp) / "source.%(ext)s")
-        with yt_dlp.YoutubeDL(options) as downloader:
-            info = extract_with_retries(downloader, url.strip(), progress)
-            if not info:
-                raise RuntimeError("The site did not return video information.")
+        try:
+            with yt_dlp.YoutubeDL(options) as downloader:
+                info = extract_with_retries(downloader, url.strip(), progress)
+                if not info:
+                    raise RuntimeError("The site did not return video information.")
+        except (yt_dlp.utils.DownloadError, RuntimeError):
+            if not (parsed.hostname == 'tiktok.com' or (parsed.hostname or '').endswith('.tiktok.com')):
+                raise
+            from src.browser_downloader import browser_download
+            # Clear incomplete downloads only inside our private temporary directory.
+            for partial in Path(temp).glob('source.*'):
+                partial.unlink()
+            browser_download(url.strip(), Path(temp) / 'source.mp4', progress)
         sources = [p for p in Path(temp).glob("source.*") if p.suffix.lower() not in (".part", ".ytdl")]
         if len(sources) != 1:
             raise RuntimeError("Could not locate the downloaded video for processing.")

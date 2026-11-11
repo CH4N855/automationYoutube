@@ -9,3 +9,4 @@ pystray>=0.19.5
 edge-tts>=7.0.0
 moviepy>=2.0.0
 yt-dlp[default,curl-cffi]>=2026.10.26
+selenium>=4.27.0
