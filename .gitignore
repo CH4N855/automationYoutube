@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+venv/
+.venv/
+env/
+
+# Google OAuth Credentials & Tokens (DO NOT COMMIT SECRETS)
+data/credentials/client_secret.json
+data/credentials/token.json
+client_secret*.json
+token.json
+
+# Staged uploads, thumbnails, and generated videos
+data/uploads/*
+data/generated/*
+data/thumbnails/*
+watch_folder/*
+
+# Keep data directory structure
+!data/uploads/.gitkeep
+!data/generated/.gitkeep
+!data/thumbnails/.gitkeep
+!data/credentials/.gitkeep
+!watch_folder/.gitkeep
