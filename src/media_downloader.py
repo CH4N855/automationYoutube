@@ -70,7 +70,17 @@ def download_video(url, destination, progress=None):
         "no_warnings": True,
     }
     if parsed.hostname == "tiktok.com" or (parsed.hostname or "").endswith(".tiktok.com"):
-        options["http_headers"] = {"Referer": "https://www.tiktok.com/"}
+        options["http_headers"] = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+            "Referer": "https://www.tiktok.com/",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        try:
+            from yt_dlp.networking.impersonate import ImpersonateTarget
+            options["impersonate"] = ImpersonateTarget.from_str("chrome")
+        except Exception:
+            pass
     try:
         import imageio_ffmpeg
         options["ffmpeg_location"] = imageio_ffmpeg.get_ffmpeg_exe()
@@ -83,13 +93,16 @@ def download_video(url, destination, progress=None):
                 info = extract_with_retries(downloader, url.strip(), progress)
                 if not info:
                     raise RuntimeError("The site did not return video information.")
-        except (yt_dlp.utils.DownloadError, RuntimeError):
-            if not (parsed.hostname == 'tiktok.com' or (parsed.hostname or '').endswith('.tiktok.com')):
+        except Exception as exc:
+            is_tiktok = parsed.hostname == "tiktok.com" or (parsed.hostname or "").endswith(".tiktok.com")
+            if not is_tiktok and "403" not in str(exc).lower():
                 raise
+            if progress:
+                progress(None, "Direct request restricted by site. Switching to background browser mode...")
             from src.browser_downloader import browser_download
             # Clear incomplete downloads only inside our private temporary directory.
             for partial in Path(temp).glob('source.*'):
-                partial.unlink()
+                partial.unlink(missing_ok=True)
             browser_download(url.strip(), Path(temp) / 'source.mp4', progress)
         sources = [p for p in Path(temp).glob("source.*") if p.suffix.lower() not in (".part", ".ytdl")]
         if len(sources) != 1:

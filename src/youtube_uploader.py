@@ -132,6 +132,7 @@ def upload_video(
         progress_callback(0.92, "Setting custom thumbnail...")
 
     thumbnail_uploaded = False
+    thumbnail_note = None
     if thumbnail_path and os.path.exists(thumbnail_path):
         try:
             thumb_media = MediaFileUpload(thumbnail_path, mimetype="image/jpeg", resumable=False)
@@ -140,11 +141,24 @@ def upload_video(
                 media_body=thumb_media
             ).execute()
             thumbnail_uploaded = True
+        except HttpError as e:
+            if getattr(e, 'resp', None) and e.resp.status == 403 or "permission" in str(e).lower() or "forbidden" in str(e).lower():
+                thumbnail_note = (
+                    "Channel is not yet phone-verified for custom thumbnails. "
+                    "Video published with YouTube's default frame thumbnail. "
+                    "(Verify at: https://www.youtube.com/verify)"
+                )
+                print(f"[YouTube] Note: {thumbnail_note}")
+            else:
+                print(f"[YouTube] Custom thumbnail notice: {e}")
         except Exception as e:
-            print(f"Notice: Failed to set custom thumbnail: {e}")
+            print(f"[YouTube] Custom thumbnail notice: {e}")
 
     if progress_callback:
-        progress_callback(1.0, "Upload Complete!")
+        complete_msg = "Upload Complete!"
+        if thumbnail_note:
+            complete_msg = "Upload Complete! (Default frame thumbnail applied)"
+        progress_callback(1.0, complete_msg)
 
     record = add_to_history(
         video_id=video_id,
@@ -160,6 +174,7 @@ def upload_video(
         "url": f"https://youtu.be/{video_id}",
         "title": title,
         "thumbnail_uploaded": thumbnail_uploaded,
+        "thumbnail_note": thumbnail_note,
         "status": "success",
         "record": record
     }
