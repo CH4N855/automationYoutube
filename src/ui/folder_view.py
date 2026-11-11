@@ -2,6 +2,7 @@ import os
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from src.ui.theme import COLORS
+from src.ui.components import add_page_header
 
 from src.folder_watcher import folder_watcher
 from src.storage import load_settings, save_settings
@@ -16,24 +17,8 @@ class FolderView(ctk.CTkFrame):
         folder_watcher.set_callback(self._on_video_detected)
 
     def _build_ui(self):
-        # Header
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", padx=10, pady=(5, 15))
-
-        title_lbl = ctk.CTkLabel(
-            header_frame,
-            text="Auto-Watch Folder",
-            font=ctk.CTkFont(size=22, weight="bold")
-        )
-        title_lbl.pack(anchor="w")
-
-        sub_lbl = ctk.CTkLabel(
-            header_frame,
-            text="Drop video files into a Windows folder to automatically queue them for YouTube posting.",
-            text_color=COLORS["muted"],
-            font=ctk.CTkFont(size=12)
-        )
-        sub_lbl.pack(anchor="w")
+        add_page_header(self, "Auto-Watch Folder",
+                        "Drop video files into a Windows folder to automatically queue them for YouTube posting.", bottom_padding=15)
 
         # Main Card
         card = ctk.CTkFrame(self, fg_color=COLORS["surface"], corner_radius=10)

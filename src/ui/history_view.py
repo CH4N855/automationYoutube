@@ -2,6 +2,7 @@ import webbrowser
 from tkinter import messagebox
 import customtkinter as ctk
 from src.ui.theme import COLORS
+from src.ui.components import add_page_header
 
 from src.storage import load_history, clear_history
 
@@ -11,24 +12,8 @@ class HistoryView(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        # Header
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", padx=10, pady=(5, 10))
-
-        title_lbl = ctk.CTkLabel(
-            header_frame,
-            text="Upload History",
-            font=ctk.CTkFont(size=22, weight="bold")
-        )
-        title_lbl.pack(anchor="w")
-
-        sub_lbl = ctk.CTkLabel(
-            header_frame,
-            text="Log of previously published videos and direct YouTube URLs.",
-            text_color=COLORS["muted"],
-            font=ctk.CTkFont(size=12)
-        )
-        sub_lbl.pack(anchor="w")
+        add_page_header(self, "Upload History",
+                        "Log of previously published videos and direct YouTube URLs.", bottom_padding=10)
 
         # Top Bar
         top_bar = ctk.CTkFrame(self, fg_color="transparent")

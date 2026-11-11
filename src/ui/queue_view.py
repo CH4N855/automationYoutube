@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from src.ui.theme import COLORS
+from src.ui.components import add_page_header
 
 from src.storage import load_queue, remove_from_queue
 from src.scheduler import scheduler
@@ -19,24 +20,8 @@ class QueueView(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        # Header
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", padx=10, pady=(5, 10))
-
-        title_lbl = ctk.CTkLabel(
-            header_frame,
-            text="Batch & Queue Manager",
-            font=ctk.CTkFont(size=22, weight="bold")
-        )
-        title_lbl.pack(anchor="w")
-
-        sub_lbl = ctk.CTkLabel(
-            header_frame,
-            text="Monitor scheduled uploads and bulk-schedule videos with automated release intervals.",
-            text_color=COLORS["muted"],
-            font=ctk.CTkFont(size=12)
-        )
-        sub_lbl.pack(anchor="w")
+        add_page_header(self, "Batch & Queue Manager",
+                        "Monitor scheduled uploads and bulk-schedule videos with automated release intervals.", bottom_padding=10)
 
         # Tabview for Queue vs Batch Auto-Scheduler
         self.tabview = ctk.CTkTabview(self, fg_color=COLORS["surface"])

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from src.ui.theme import COLORS
+from src.ui.components import add_page_header
 from PIL import Image
 
 import config
@@ -24,24 +25,8 @@ class UploadView(ctk.CTkScrollableFrame):
         self._build_ui()
 
     def _build_ui(self):
-        # Header
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.pack(fill="x", padx=10, pady=(5, 15))
-
-        title_lbl = ctk.CTkLabel(
-            header_frame,
-            text="New Video Upload",
-            font=ctk.CTkFont(size=22, weight="bold")
-        )
-        title_lbl.pack(anchor="w")
-
-        sub_lbl = ctk.CTkLabel(
-            header_frame,
-            text="Upload videos directly or schedule them for future automated release.",
-            text_color=COLORS["muted"],
-            font=ctk.CTkFont(size=12)
-        )
-        sub_lbl.pack(anchor="w")
+        add_page_header(self, "New Video Upload",
+                        "Upload videos directly or schedule them for future automated release.", bottom_padding=15)
 
         # Two-column container
         content_frame = ctk.CTkFrame(self, fg_color="transparent")
