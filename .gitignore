@@ -1,13 +1,5 @@
-# Tests and test scripts
-tests/
-test*.py
-
-# Playwright MCP artifacts
-.playwright-mcp/
-gcm_out.txt
-test_write.py
-test.txt
-
+# Python byte code and virtual environments
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -16,21 +8,38 @@ venv/
 .venv/
 env/
 
-# Google OAuth Credentials & Tokens (DO NOT COMMIT SECRETS)
-data/credentials/client_secret.json
-data/credentials/token.json
+# Tests and test scripts (USER SPECIFIED: NEVER PUSH TESTS)
+tests/
+test*.py
+
+# Automation, browser, and temporary logs
+.playwright-mcp/
+gcm_out.txt
+test_write.py
+test.txt
+auth_url.txt
+*.log
+
+# Sensitive Google OAuth credentials & tokens (CRITICAL SECURITY)
+data/credentials/*
+!data/credentials/.gitkeep
 client_secret*.json
+token*.json
 token.json
 
-# Staged uploads, thumbnails, and generated videos
+# Local user runtime data, video queues, history, and settings
+data/*.json
 data/uploads/*
-data/generated/*
-data/thumbnails/*
-watch_folder/*
-
-# Keep data directory structure
 !data/uploads/.gitkeep
+data/generated/*
 !data/generated/.gitkeep
+data/thumbnails/*
 !data/thumbnails/.gitkeep
-!data/credentials/.gitkeep
+watch_folder/*
 !watch_folder/.gitkeep
+
+# Media files that might be accidentally placed in workspace root
+*.mp4
+*.mp3
+*.wav
+*.srt

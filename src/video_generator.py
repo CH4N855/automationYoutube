@@ -92,8 +92,25 @@ def select_template_for_niche(niche: Optional[str]) -> Dict[str, Any]:
     return random.choice(FACT_TEMPLATES)
 
 async def _synthesize_speech(text: str, output_path: str, voice: str):
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(output_path)
+    """Synthesize speech with retry logic and fallback voice if NoAudioReceived occurs."""
+    voices_to_try = [voice]
+    for fallback in ["en-US-GuyNeural", "en-US-JennyNeural"]:
+        if fallback not in voices_to_try:
+            voices_to_try.append(fallback)
+
+    last_err = None
+    for v in voices_to_try:
+        for attempt in range(3):
+            try:
+                communicate = edge_tts.Communicate(text, v)
+                await communicate.save(output_path)
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                    return
+            except Exception as e:
+                last_err = e
+                await asyncio.sleep(1.0)
+
+    raise RuntimeError(f"Edge-TTS speech synthesis failed: {last_err}")
 
 def generate_voiceover(text: str, output_path: str, voice: Optional[str] = None) -> str:
     chosen_voice = resolve_voice(voice)
@@ -150,61 +167,51 @@ def create_ai_short(
     # 2. Generate Voiceover Audio with selected voice
     generate_voiceover(script_text, audio_path, voice=voice)
 
+    # 2.5 Generate Animated Subtitles with Whisper
+    srt_path = None
     if progress_callback:
-        progress_callback(0.40, "Rendering 9:16 Vertical Video...")
-
-    # 3. Create Video - Try MoviePy, fallback to direct FFmpeg to guarantee narration is NEVER lost
-    rendered = False
-    render_error = None
-
+        progress_callback(0.30, "Generating Animated Subtitles...")
     try:
-        from moviepy import AudioFileClip, ImageClip
-        audio_clip = AudioFileClip(audio_path)
-        duration = audio_clip.duration
-
-        bg_path = create_background_image()
-        bg_clip = ImageClip(bg_path).with_duration(duration)
-
-        final_video = bg_clip.with_audio(audio_clip)
-        final_video.write_videofile(
-            video_path,
-            fps=24,
-            codec="libx264",
-            audio_codec="aac",
-            preset="ultrafast",
-            logger=None
-        )
-        audio_clip.close()
-        bg_clip.close()
-        final_video.close()
-        rendered = True
+        from src.subtitle_generator import generate_subtitles_from_audio
+        srt_path = generate_subtitles_from_audio(audio_path)
     except Exception as e:
-        render_error = str(e)
-        if progress_callback:
-            progress_callback(0.60, f"MoviePy notice: muxing with FFmpeg encoder...")
+        print(f"Subtitle notice: {e}")
 
-    if not rendered:
-        try:
-            import imageio_ffmpeg
-            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-            bg_path = create_background_image()
-            cmd = [
-                ffmpeg_exe, "-y",
-                "-loop", "1",
-                "-i", bg_path,
-                "-i", audio_path,
-                "-c:v", "libx264",
-                "-tune", "stillimage",
-                "-c:a", "aac",
-                "-b:a", "192k",
-                "-pix_fmt", "yuv420p",
-                "-shortest",
-                video_path
-            ]
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            rendered = True
-        except Exception as e2:
-            raise RuntimeError(f"Video rendering failed (MoviePy: {render_error}; FFmpeg: {e2})")
+    if progress_callback:
+        progress_callback(0.50, "Rendering 9:16 Vertical Video...")
+
+    # 3. Create Video with direct FFmpeg stream muxing & burned subtitles
+    try:
+        import imageio_ffmpeg
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        bg_path = create_background_image()
+
+        cmd = [
+            ffmpeg_exe, "-y",
+            "-loop", "1",
+            "-i", bg_path,
+            "-i", audio_path,
+        ]
+
+        if srt_path and os.path.exists(srt_path):
+            srt_filename = os.path.basename(srt_path)
+            sub_filter = f"subtitles={srt_filename}:force_style='FontName=Arial,FontSize=20,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=300'"
+            cmd.extend(["-vf", sub_filter])
+
+        cmd.extend([
+            "-c:v", "libx264",
+            "-tune", "stillimage",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-pix_fmt", "yuv420p",
+            "-shortest",
+            video_path
+        ])
+
+        run_dir = os.path.dirname(audio_path)
+        subprocess.run(cmd, cwd=run_dir, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except Exception as e:
+        raise RuntimeError(f"Video rendering failed: {e}")
 
     if progress_callback:
         progress_callback(0.90, "Creating Thumbnail...")
