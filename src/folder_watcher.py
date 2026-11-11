@@ -2,6 +2,7 @@ import os
 import time
 import json
 import threading
+import subprocess
 from pathlib import Path
 from typing import Optional, Callable, Set
 
@@ -16,6 +17,7 @@ class FolderWatcher:
         self._thread: Optional[threading.Thread] = None
         self._folder_path: str = str(config.WATCH_DIR)
         self._processed: Set[str] = self._load_processed()
+        self._invalid_files = {}
         self._on_video_detected: Optional[Callable[[str], None]] = None
 
     def set_callback(self, callback: Callable[[str], None]):
@@ -75,11 +77,35 @@ class FolderWatcher:
                             ext = os.path.splitext(entry.name)[1].lower()
                             if ext in valid_extensions and entry.path not in self._processed:
                                 if self._is_file_ready(entry.path):
+                                    stat = entry.stat()
+                                    signature = (stat.st_size, stat.st_mtime_ns)
+                                    if self._invalid_files.get(entry.path) == signature:
+                                        continue
+                                    if not self._has_video_frame(entry.path):
+                                        self._invalid_files[entry.path] = signature
+                                        print(f"Skipping file without a decodable video frame: {entry.path}")
+                                        continue
+                                    self._invalid_files.pop(entry.path, None)
                                     self._process_new_video(entry.path)
             except Exception as e:
                 print(f"Folder watcher error: {e}")
 
             time.sleep(interval)
+
+    @staticmethod
+    def _has_video_frame(filepath: str) -> bool:
+        """Reject audio-only and unreadable files before adding them to the queue."""
+        try:
+            import imageio_ffmpeg
+            result = subprocess.run(
+                [imageio_ffmpeg.get_ffmpeg_exe(), "-v", "error", "-i", filepath,
+                 "-map", "0:v:0", "-frames:v", "1", "-f", "null", "-"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=60,
+            )
+            return result.returncode == 0
+        except (OSError, subprocess.SubprocessError, ImportError) as exc:
+            print(f"Video validation error: {exc}")
+            return False
 
     def _process_new_video(self, video_path: str):
         from src.metadata_generator import auto_generate_video_metadata
