@@ -36,8 +36,11 @@ def download_video(url, destination, progress=None):
         "windowsfilenames": True,
         "progress_hooks": [hook],
         "quiet": True,
+        "no_color": True,
         "no_warnings": True,
     }
+    if parsed.hostname == "tiktok.com" or (parsed.hostname or "").endswith(".tiktok.com"):
+        options["http_headers"] = {"Referer": "https://www.tiktok.com/"}
     try:
         import imageio_ffmpeg
         options["ffmpeg_location"] = imageio_ffmpeg.get_ffmpeg_exe()
