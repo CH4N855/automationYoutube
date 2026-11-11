@@ -37,6 +37,8 @@ def clean_topic_from_filename(filename: str) -> str:
     """Extract a clean keyword topic from a video file name."""
     name = os.path.splitext(os.path.basename(filename))[0]
 
+    # Remove YouTube video IDs in brackets, e.g. [6U-wSR8Jnc0] or [OU-wSRI3nc0]
+    name = re.sub(r'\[[a-zA-Z0-9_\-]{8,15}\]', '', name)
     # Remove generic generator prefixes and random hex hashes (e.g. gemini_generated_video_958eabb5)
     name = re.sub(r'gemini[_\s\-]?generated[_\s\-]?video[_\s\-]?', '', name, flags=re.IGNORECASE)
     name = re.sub(r'\b[a-f0-9]{8,12}\b', '', name, flags=re.IGNORECASE)
@@ -44,7 +46,9 @@ def clean_topic_from_filename(filename: str) -> str:
     name = re.sub(r'\b(1080p|720p|4k|h264|x264|final|render|part\d*|v\d*|clip|vid)\b', '', name, flags=re.IGNORECASE)
     name = re.sub(r'\s+', ' ', name).strip()
 
-    return name.title() if name else Path(filename).stem
+    if not name:
+        return Path(filename).stem
+    return name.title() if any('a' <= c.lower() <= 'z' for c in name) else name
 
 def read_accompanying_metadata(video_path: str) -> Optional[Dict[str, Any]]:
     """Check for companion script, description, or notes file alongside the video."""
@@ -85,7 +89,11 @@ def transcribe_video_audio(video_path: str) -> Optional[str]:
 
         from faster_whisper import WhisperModel
         model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segments, _ = model.transcribe(audio_np, word_timestamps=False)
+        segments, info = model.transcribe(audio_np, word_timestamps=False)
+
+        # Skip phonetic gibberish when Whisper detects low-resource scripts (like Khmer) or low confidence
+        if getattr(info, "language", "") in ("km", "lo", "my") or getattr(info, "language_probability", 1.0) < 0.45:
+            return None
 
         spoken_chunks = [s.text.strip() for s in segments if s.text.strip()]
         if spoken_chunks:
@@ -102,7 +110,7 @@ def classify_category(text: str) -> str:
     scores = {}
 
     for cat_id, keywords in CATEGORY_KEYWORDS.items():
-        score = sum(1 for kw in keywords if kw in text_lower)
+        score = sum(1 for kw in keywords if re.search(r"\b" + re.escape(kw) + r"\b", text_lower))
         if score > 0:
             scores[cat_id] = score
 
@@ -199,14 +207,19 @@ def auto_generate_video_metadata(
         if not hook_candidate:
             hook_candidate = clean_fallback
 
+        has_non_ascii_name = any(ord(c) > 127 for c in clean_fallback)
+        if has_non_ascii_name and len(clean_fallback) > 3:
+            hook_candidate = clean_fallback
+
         # Capitalize Title cleanly
         title = hook_candidate.rstrip(".!?")
         is_question = any(title.lower().startswith(q) for q in ["did you know", "why", "how", "what", "can you", "is it", "who", "which", "are "])
 
-        if not is_question:
-            title = title.title()
-        else:
-            title = title[0].upper() + title[1:] + "?"
+        if any('a' <= c.lower() <= 'z' for c in title):
+            if not is_question:
+                title = title.title()
+            else:
+                title = title[0].upper() + title[1:] + "?"
 
         if is_short:
             if "#Shorts" not in title:

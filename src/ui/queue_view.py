@@ -1,6 +1,6 @@
 import os
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from src.ui.theme import COLORS
@@ -9,6 +9,7 @@ from src.ui.components import add_page_header
 from src.storage import load_queue, remove_from_queue
 from src.scheduler import scheduler
 from src.youtube_auth import is_authenticated
+from src.youtube_uploader import format_youtube_error
 import config
 
 class QueueView(ctk.CTkFrame):
@@ -130,10 +131,16 @@ class QueueView(ctk.CTkFrame):
             meta_label.pack(anchor="w", pady=(4, 0))
             labels = [title_label, meta_label]
             if item.get("error_message"):
+                clean_err = format_youtube_error(item["error_message"])
+                is_quota = "daily upload limit" in clean_err.lower() or "quota" in clean_err.lower()
                 error_label = ctk.CTkLabel(
-                    info_frame, text=f"Last attempt: {item['error_message']}",
-                    text_color=COLORS["danger"], justify="left", wraplength=420,
-                    font=ctk.CTkFont(size=12))
+                    info_frame,
+                    text=f"Notice: {clean_err}",
+                    text_color=COLORS["warning"] if is_quota else COLORS["danger"],
+                    justify="left",
+                    wraplength=420,
+                    font=ctk.CTkFont(size=12)
+                )
                 error_label.pack(anchor="w", pady=(8, 0))
                 labels.append(error_label)
             info_frame.bind("<Configure>", lambda event, targets=labels: [
@@ -143,18 +150,28 @@ class QueueView(ctk.CTkFrame):
             action_frame = ctk.CTkFrame(card, fg_color="transparent")
             action_frame.grid(row=0, column=1, sticky="e", padx=12, pady=10)
 
-            up_btn = ctk.CTkButton(
-                action_frame,
-                text="Retry upload" if status == "FAILED" else "Upload now",
-                width=100,
-                height=40,
-                fg_color=COLORS["accent"],
-                hover_color=COLORS["accent_hover"],
-                command=lambda i=item["id"]: self._upload_single_now(i)
-            )
-            up_btn.pack(side="left", padx=5)
             if status == "UPLOADING":
-                up_btn.configure(state="disabled", text="Uploading...")
+                up_btn = ctk.CTkButton(
+                    action_frame,
+                    text="Reset",
+                    width=90,
+                    height=40,
+                    fg_color=COLORS["raised"],
+                    hover_color=COLORS["secondary_hover"],
+                    command=lambda i=item["id"]: self._reset_item_to_queued(i)
+                )
+                up_btn.pack(side="left", padx=5)
+            else:
+                up_btn = ctk.CTkButton(
+                    action_frame,
+                    text="Retry upload" if status == "FAILED" else "Upload now",
+                    width=100,
+                    height=40,
+                    fg_color=COLORS["accent"],
+                    hover_color=COLORS["accent_hover"],
+                    command=lambda i=item["id"]: self._upload_single_now(i)
+                )
+                up_btn.pack(side="left", padx=5)
 
             del_btn = ctk.CTkButton(
                 action_frame,
@@ -166,8 +183,6 @@ class QueueView(ctk.CTkFrame):
                 command=lambda i=item["id"]: self._remove_item(i)
             )
             del_btn.pack(side="left", padx=5)
-            if status == "UPLOADING":
-                del_btn.configure(state="disabled")
 
     def _upload_all_now(self):
         queue = load_queue()
@@ -213,6 +228,13 @@ class QueueView(ctk.CTkFrame):
             self.after(0, lambda: complete(res))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _reset_item_to_queued(self, item_id: str):
+        from src.storage import update_queue_item
+        update_queue_item(item_id, {"status": "queued", "error_message": None})
+        self.refresh_queue()
+        if self.on_queue_change:
+            self.on_queue_change()
 
     def _remove_item(self, item_id: str):
         remove_from_queue(item_id)
@@ -260,7 +282,7 @@ class QueueView(ctk.CTkFrame):
 
         ctk.CTkLabel(row_time, text="Start Release Date/Time (UTC)", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w")
         self.batch_start_entry = ctk.CTkEntry(row_time, height=40)
-        suggest_start = datetime.now() + timedelta(hours=2)
+        suggest_start = datetime.now(timezone.utc) + timedelta(hours=2)
         self.batch_start_entry.insert(0, suggest_start.strftime("%Y-%m-%d %H:%M"))
         self.batch_start_entry.grid(row=1, column=0, sticky="ew", padx=(0, 5))
 

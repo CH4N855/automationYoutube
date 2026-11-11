@@ -1,5 +1,5 @@
 import os
-import random
+import uuid
 from pathlib import Path
 from typing import Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
@@ -131,7 +131,7 @@ def generate_youtube_thumbnail(
 
     # Save Thumbnail
     if not output_filename:
-        output_filename = f"thumb_{random.randint(1000, 9999)}.jpg"
+        output_filename = f"thumb_{uuid.uuid4().hex}.jpg"
 
     output_path = str(THUMBNAILS_DIR / output_filename)
     img.save(output_path, "JPEG", quality=95)

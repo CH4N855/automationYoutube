@@ -40,6 +40,7 @@ watch_folder/*
 
 # Media files that might be accidentally placed in workspace root
 *.mp4
+*.mov
 *.mp3
 *.wav
 *.srt

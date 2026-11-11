@@ -4,8 +4,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, Callable
 
-from src.storage import load_queue, update_queue_item, remove_from_queue, add_to_queue
-from src.youtube_uploader import upload_video
+from src.storage import load_queue, update_queue_item, remove_from_queue, add_to_queue, save_queue
+from src.youtube_uploader import upload_video, format_youtube_error
 from src.youtube_auth import is_authenticated
 
 class SchedulerDaemon:
@@ -21,9 +21,24 @@ class SchedulerDaemon:
     def start(self, poll_seconds: int = 30):
         if self._running:
             return
+        self._cleanup_stale_uploading_items()
         self._running = True
         self._thread = threading.Thread(target=self._loop, args=(poll_seconds,), daemon=True)
         self._thread.start()
+
+    def _cleanup_stale_uploading_items(self):
+        try:
+            queue = load_queue()
+            changed = False
+            for item in queue:
+                if item.get("status") == "uploading":
+                    item["status"] = "queued"
+                    item["error_message"] = "Previous upload session was interrupted. Ready to retry."
+                    changed = True
+            if changed:
+                save_queue(queue)
+        except Exception as e:
+            print(f"Error resetting stale queue items: {e}")
 
     def stop(self):
         self._running = False
@@ -105,8 +120,9 @@ class SchedulerDaemon:
             remove_from_queue(item_id)
             return {"success": True, "result": result}
         except Exception as e:
-            update_queue_item(item_id, {"status": "failed", "error_message": str(e)})
-            return {"success": False, "error": str(e)}
+            friendly_err = format_youtube_error(e)
+            update_queue_item(item_id, {"status": "failed", "error_message": friendly_err})
+            return {"success": False, "error": friendly_err}
 
     def batch_auto_schedule(
         self,

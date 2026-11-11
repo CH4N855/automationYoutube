@@ -7,7 +7,7 @@ import os
 import sys
 import time
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from datetime import datetime
 
 # Workspace root
@@ -32,6 +32,19 @@ IGNORED_PATTERNS = [
 def is_safe_path(filepath: str) -> bool:
     """Ensure no credential, token, or media paths are staged or committed."""
     f_lower = filepath.replace("\\", "/").lower()
+    path = PurePosixPath(f_lower)
+    if not f_lower or path.is_absolute() or ".." in path.parts or ":" in f_lower:
+        return False
+    if path.suffix in {".mp4", ".mov", ".mp3", ".wav", ".mkv", ".avi", ".webm", ".srt"}:
+        return False
+    if path.match("token*.json") or path.match("client_secret*.json"):
+        return False
+    if path.parts[0] == "data" and path.suffix == ".json":
+        return False
+    if any(part == ".env" or part.startswith(".env.") for part in path.parts):
+        return False
+    if any(part in {".venv", "venv", "env", "node_modules"} for part in path.parts):
+        return False
     for pattern in IGNORED_PATTERNS:
         if pattern.lower() in f_lower:
             return False
@@ -62,18 +75,23 @@ class GitAutoPushAgent:
 
     def get_status_entries(self):
         """Get list of changed files from git status."""
-        res = run_git(["status", "--porcelain"])
+        res = run_git(["status", "--porcelain", "-z", "--untracked-files=all"])
         if res.returncode != 0:
             return []
         
-        lines = res.stdout.splitlines()
         entries = []
-        for line in lines:
+        records = iter(res.stdout.split("\0"))
+        for line in records:
             if len(line) >= 4:
                 status_code = line[:2]
-                file_rel = line[3:].strip().strip('"')
+                file_rel = line[3:]
                 if file_rel:
                     entries.append((status_code, file_rel))
+                if "R" in status_code or "C" in status_code:
+                    # In -z output the destination is first, followed by the source.
+                    source = next(records, "")
+                    if source:
+                        entries.append((status_code, source))
         return entries
 
     def push_pending_changes(self):
@@ -94,19 +112,27 @@ class GitAutoPushAgent:
 
         self.log(f"Detected {len(safe_files_to_add)} updated file(s). Staging...")
         for f in safe_files_to_add:
-            run_git(["add", f])
+            if run_git(["add", "--", f]).returncode != 0:
+                self.log("Staging failed; no commit was created.")
+                return False
 
         # Extra safety check on staged files
-        diff_staged = run_git(["diff", "--cached", "--name-only"]).stdout.splitlines()
-        for staged in diff_staged:
-            staged = staged.strip()
+        diff_staged = run_git(["diff", "--cached", "--name-only", "--no-renames", "-z"])
+        if diff_staged.returncode != 0:
+            return False
+        for staged in filter(None, diff_staged.stdout.split("\0")):
             if not is_safe_path(staged):
                 self.log(f"🚨 Unstaging sensitive file: {staged}")
-                run_git(["reset", "HEAD", staged])
+                if run_git(["reset", "HEAD", "--", staged]).returncode != 0:
+                    self.log("Could not unstage a prohibited file; commit cancelled.")
+                    return False
 
         # Verify there are still staged files to commit
-        diff_final = [f.strip() for f in run_git(["diff", "--cached", "--name-only"]).stdout.splitlines() if f.strip()]
-        if not diff_final:
+        diff_result = run_git(["diff", "--cached", "--name-only", "--no-renames", "-z"])
+        if diff_result.returncode != 0:
+            return False
+        diff_final = [f for f in diff_result.stdout.split("\0") if f]
+        if not diff_final or any(not is_safe_path(f) for f in diff_final):
             return False
 
         # Build clean commit message

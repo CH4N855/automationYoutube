@@ -1,6 +1,6 @@
 import os
 import asyncio
-import random
+import uuid
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
@@ -97,10 +97,10 @@ def create_ai_video(
     5. Returns video path and metadata ready for upload!
     """
     is_short = (str(format_type).lower().strip() == "short")
-    timestamp = random.randint(1000, 9999)
+    generation_id = uuid.uuid4().hex
     prefix = "ai_short" if is_short else "ai_long"
-    video_filename = f"{prefix}_{timestamp}.mp4"
-    audio_path = str(GENERATED_DIR / f"audio_{timestamp}.mp3")
+    video_filename = f"{prefix}_{generation_id}.mp4"
+    audio_path = str(GENERATED_DIR / f"audio_{generation_id}.mp3")
     video_path = str(GENERATED_DIR / video_filename)
 
     if not custom_script or not custom_script.strip():
@@ -144,7 +144,10 @@ def create_ai_video(
     try:
         import imageio_ffmpeg
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-        bg_path = create_background_image(width=width, height=height)
+        bg_path = create_background_image(
+            width=width, height=height,
+            output_path=str(GENERATED_DIR / f"bg_{generation_id}.png"),
+        )
 
         cmd = [
             ffmpeg_exe, "-y",

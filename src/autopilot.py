@@ -1,6 +1,5 @@
 import threading
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Any, Optional, Callable
 
 import config
@@ -14,6 +13,10 @@ class AutoPilotEngine:
         self._recurring_active = False
         self._thread: Optional[threading.Thread] = None
         self._on_status_update: Optional[Callable[[str], None]] = None
+        self._stop_event = threading.Event()
+        self._state_lock = threading.Lock()
+        self._daily_post_lock = threading.Lock()
+        self._last_posted_day: Optional[str] = None
 
     def set_callback(self, cb: Callable[[str], None]):
         self._on_status_update = cb
@@ -87,42 +90,55 @@ class AutoPilotEngine:
         custom_script: Optional[str] = None
     ):
         """Schedule 1 automated video generation and posting every day."""
-        if self._recurring_active:
-            return
         if not custom_script or not custom_script.strip():
             raise ValueError("Provide a script before enabling daily publishing.")
-        self._recurring_active = True
-        self._thread = threading.Thread(target=self._daily_loop, args=(post_hour, niche, voice, format_type, custom_script), daemon=True)
-        self._thread.start()
+        if not 0 <= post_hour <= 23:
+            raise ValueError("Posting hour must be between 0 and 23.")
+        with self._state_lock:
+            if self._recurring_active:
+                return
+            # Each run owns its cancellation event. Restarting must not revive
+            # an older worker that is asleep or still finishing an upload.
+            self._stop_event = threading.Event()
+            self._recurring_active = True
+            self._thread = threading.Thread(
+                target=self._daily_loop,
+                args=(self._stop_event, post_hour, niche, voice, format_type, custom_script),
+                daemon=True,
+            )
+            self._thread.start()
         mode_label = "Shorts" if format_type == "short" else "Long Videos"
         self._log(f"🟢 Daily Auto-Pilot activated for {mode_label}. Will post every day at {post_hour:02d}:00.")
 
     def stop_daily_automation(self):
-        self._recurring_active = False
+        with self._state_lock:
+            self._recurring_active = False
+            self._stop_event.set()
         self._log("🔴 Daily Auto-Pilot stopped.")
 
     def is_active(self) -> bool:
         return self._recurring_active
 
-    def _daily_loop(self, post_hour: int, niche: Optional[str] = None, voice: Optional[str] = None, format_type: str = "short", custom_script: Optional[str] = None):
-        last_posted_day = None
-
-        while self._recurring_active:
+    def _daily_loop(self, stop_event: threading.Event, post_hour: int, niche: Optional[str] = None, voice: Optional[str] = None, format_type: str = "short", custom_script: Optional[str] = None):
+        while not stop_event.is_set():
             try:
                 now = datetime.now()
                 today_str = now.strftime("%Y-%m-%d")
 
-                # Check if it's the target hour and we haven't posted today
-                if now.hour == post_hour and last_posted_day != today_str:
-                    self._log(f"⏰ Daily trigger time reached ({now.strftime('%H:%M')}). Generating & Posting...")
-                    res = self.generate_and_post_video_now(niche=niche, voice=voice, format_type=format_type, custom_script=custom_script)
-                    if res.get("success"):
-                        last_posted_day = today_str
-                    else:
-                        self._log(f"⚠️ Daily posting encountered an issue: {res.get('error')}. Will retry next check.")
+                if now.hour == post_hour and self._daily_post_lock.acquire(blocking=False):
+                    try:
+                        if not stop_event.is_set() and self._last_posted_day != today_str:
+                            self._log(f"⏰ Daily trigger time reached ({now.strftime('%H:%M')}). Generating & Posting...")
+                            res = self.generate_and_post_video_now(niche=niche, voice=voice, format_type=format_type, custom_script=custom_script)
+                            if res.get("success"):
+                                self._last_posted_day = today_str
+                            else:
+                                self._log(f"⚠️ Daily posting encountered an issue: {res.get('error')}. Will retry next check.")
+                    finally:
+                        self._daily_post_lock.release()
             except Exception as e:
                 self._log(f"⚠️ Exception in daily loop: {e}")
 
-            time.sleep(60)
+            stop_event.wait(60)
 
 autopilot = AutoPilotEngine()

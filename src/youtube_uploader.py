@@ -45,6 +45,28 @@ def get_video_info(video_path: str) -> Dict[str, Any]:
 
     return info
 
+
+def format_youtube_error(exc_or_msg: Any) -> str:
+    """Translate raw YouTube API errors into clear, actionable explanations."""
+    err_str = str(exc_or_msg)
+    err_lower = err_str.lower()
+    if "uploadlimitexceeded" in err_lower or "exceeded the number of videos" in err_lower:
+        return (
+            "Daily upload limit reached: YouTube limits uploads to ~10 videos/day for standard channels. "
+            "This quota resets automatically in 24 hours. (To unlock 100+ uploads/day, enable 'Advanced features' "
+            "in YouTube Studio: studio.youtube.com > Settings > Channel > Feature eligibility)."
+        )
+    if "quotaexceeded" in err_lower or "daily limit exceeded" in err_lower:
+        return (
+            "YouTube API quota exceeded for today. Google Cloud resets API quota daily at midnight Pacific Time (PT)."
+        )
+    if "invalid_grant" in err_lower or "token has expired" in err_lower:
+        return (
+            "YouTube authorization has expired. Please re-authorize your channel in 'Settings & Channel'."
+        )
+    return err_str
+
+
 def upload_video(
     video_path: str,
     title: str,
@@ -121,8 +143,8 @@ def upload_video(
             if e.resp.status in [500, 502, 503, 504]:
                 time.sleep(2)
                 continue
-            else:
-                raise
+            friendly_msg = format_youtube_error(e)
+            raise RuntimeError(friendly_msg) from e
 
     video_id = response.get("id")
     if not video_id:

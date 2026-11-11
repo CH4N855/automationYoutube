@@ -1,6 +1,6 @@
 import os
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from src.ui.theme import COLORS
@@ -259,7 +259,7 @@ class UploadView(ctk.CTkScrollableFrame):
         self.sched_check.pack(anchor="w", padx=15, pady=(5, 5))
 
         self.sched_frame = ctk.CTkFrame(right_col, fg_color=COLORS["bg"], corner_radius=6)
-        sched_time_suggest = datetime.now() + timedelta(hours=2)
+        sched_time_suggest = datetime.now(timezone.utc) + timedelta(hours=2)
 
         ctk.CTkLabel(self.sched_frame, text="Release (YYYY-MM-DD HH:MM UTC):", font=ctk.CTkFont(size=12)).pack(anchor="w", padx=10, pady=(5, 2))
         self.sched_entry = ctk.CTkEntry(
@@ -463,8 +463,8 @@ class UploadView(ctk.CTkScrollableFrame):
 
                 self.after(0, update_ui)
             except Exception as e:
-                def on_err():
-                    self.status_lbl.configure(text=f"Auto-metadata notice: {e}", text_color=COLORS["muted"])
+                def on_err(error=str(e)):
+                    self.status_lbl.configure(text=f"Auto-metadata notice: {error}", text_color=COLORS["muted"])
                     self.auto_meta_btn.configure(state="normal", text="✨ Auto-Detect Title, Desc & Tags")
                 self.after(0, on_err)
 
@@ -485,6 +485,23 @@ class UploadView(ctk.CTkScrollableFrame):
             messagebox.showerror("Error", "YouTube account is not connected. Go to 'Settings & Channel' to connect.")
             return
 
+        try:
+            scheduled_time = self._get_scheduled_time()
+        except ValueError as exc:
+            messagebox.showerror("Invalid release time", str(exc))
+            return
+
+        # Capture the chosen media and options before starting background work.
+        video_path = self.selected_video_path
+        selected_thumb_path = self.selected_thumb_path
+        fmt_choice = self.upload_format_menu.get().lower()
+        fallback_title = self.title_entry.get().strip()
+        fallback_desc = self.desc_textbox.get("1.0", "end-1c").strip()
+        fallback_tags = [t.strip() for t in self.tags_entry.get().split(",") if t.strip()]
+        fallback_category = config.CATEGORY_NAME_TO_ID.get(self.cat_menu.get(), "22")
+        privacy = self.privacy_menu.get()
+        kids = self.kids_var.get()
+
         self.one_click_btn.configure(state="disabled", text="⚡ Processing 1-Click Auto Upload...")
         self.upload_btn.configure(state="disabled")
         self.queue_btn.configure(state="disabled")
@@ -496,27 +513,24 @@ class UploadView(ctk.CTkScrollableFrame):
                 self.after(0, lambda: self.prog_bar.set(0.15))
 
                 force_fmt = None
-                fmt_choice = self.upload_format_menu.get().lower()
                 if "short" in fmt_choice:
                     force_fmt = "short"
                 elif "long" in fmt_choice:
                     force_fmt = "long"
 
                 from src.metadata_generator import auto_generate_video_metadata
-                meta = auto_generate_video_metadata(self.selected_video_path, force_format=force_fmt)
+                meta = auto_generate_video_metadata(video_path, force_format=force_fmt)
 
-                title = meta.get("title") or self.title_entry.get().strip()
+                title = meta.get("title") or fallback_title
                 if not title:
-                    title = os.path.splitext(os.path.basename(self.selected_video_path))[0].replace("_", " ").title()
+                    title = os.path.splitext(os.path.basename(video_path))[0].replace("_", " ").title()
 
                 settings = load_settings()
                 footer = settings.get("default_description_footer", "").strip()
-                base_desc = meta.get("description") or self.desc_textbox.get("1.0", "end-1c").strip()
+                base_desc = meta.get("description") or fallback_desc
                 desc = f"{base_desc}\n\n{footer}".strip() if footer else base_desc
-                tags = meta.get("tags") or [t.strip() for t in self.tags_entry.get().split(",") if t.strip()]
-                cat_id = meta.get("category_id") or config.CATEGORY_NAME_TO_ID.get(self.cat_menu.get(), "22")
-                privacy = self.privacy_menu.get()
-                kids = self.kids_var.get()
+                tags = meta.get("tags") or fallback_tags
+                cat_id = meta.get("category_id") or fallback_category
 
                 def sync_ui():
                     self.title_entry.delete(0, "end")
@@ -531,7 +545,7 @@ class UploadView(ctk.CTkScrollableFrame):
                 self.after(0, sync_ui)
 
                 # Step 2: Auto-generate high-CTR thumbnail if needed
-                thumb_path = self.selected_thumb_path
+                thumb_path = selected_thumb_path
                 if not thumb_path or not os.path.exists(thumb_path):
                     self.after(0, lambda: self.status_lbl.configure(text="Step 2/3: Generating high-CTR custom thumbnail...", text_color=COLORS["warning"]))
                     self.after(0, lambda: self.prog_bar.set(0.30))
@@ -556,18 +570,20 @@ class UploadView(ctk.CTkScrollableFrame):
                 self.after(0, lambda: self.status_lbl.configure(text="Step 3/3: Uploading video directly to YouTube...", text_color=COLORS["warning"]))
 
                 def progress_cb(percent, msg):
-                    self.prog_bar.set(percent)
-                    self.status_lbl.configure(text=msg)
+                    def update_progress():
+                        self.prog_bar.set(percent)
+                        self.status_lbl.configure(text=msg)
+                    self.after(0, update_progress)
 
                 result = upload_video(
-                    video_path=self.selected_video_path,
+                    video_path=video_path,
                     title=title,
                     description=desc,
                     tags=tags,
                     category_id=cat_id,
                     privacy_status=privacy,
                     thumbnail_path=thumb_path,
-                    scheduled_time=None,
+                    scheduled_time=scheduled_time,
                     made_for_kids=kids,
                     progress_callback=progress_cb
                 )
@@ -652,6 +668,19 @@ class UploadView(ctk.CTkScrollableFrame):
         else:
             self.sched_frame.pack_forget()
 
+    def _get_scheduled_time(self):
+        """Validate the UTC release field; never silently publish an invalid schedule."""
+        if not self.sched_var.get():
+            return None
+        try:
+            release = datetime.strptime(self.sched_entry.get().strip(), "%Y-%m-%d %H:%M")
+        except ValueError as exc:
+            raise ValueError("Enter a release time in YYYY-MM-DD HH:MM format (UTC).") from exc
+        release = release.replace(tzinfo=timezone.utc)
+        if release <= datetime.now(timezone.utc):
+            raise ValueError("The release time must be in the future (UTC).")
+        return release.strftime("%Y-%m-%dT%H:%M:%SZ")
+
     def _start_upload_now(self):
         if not self.selected_video_path or not os.path.exists(self.selected_video_path):
             messagebox.showerror("Error", "Please select a valid video file first.")
@@ -666,62 +695,63 @@ class UploadView(ctk.CTkScrollableFrame):
             messagebox.showerror("Error", "YouTube account is not connected. Go to 'Settings & Channel' to connect.")
             return
 
+        try:
+            scheduled_time = self._get_scheduled_time()
+        except ValueError as exc:
+            messagebox.showerror("Invalid release time", str(exc))
+            return
+
+        upload_options = {
+            "video_path": self.selected_video_path,
+            "title": title,
+            "description": self.desc_textbox.get("1.0", "end-1c").strip(),
+            "tags": [t.strip() for t in self.tags_entry.get().split(",") if t.strip()],
+            "category_id": config.CATEGORY_NAME_TO_ID.get(self.cat_menu.get(), "22"),
+            "privacy_status": self.privacy_menu.get(),
+            "thumbnail_path": self.selected_thumb_path,
+            "scheduled_time": scheduled_time,
+            "made_for_kids": self.kids_var.get(),
+        }
+
         # Disable buttons during upload
         self.upload_btn.configure(state="disabled")
         self.queue_btn.configure(state="disabled")
+        self.one_click_btn.configure(state="disabled")
 
-        thread = threading.Thread(target=self._upload_worker, daemon=True)
+        thread = threading.Thread(target=self._upload_worker, args=(upload_options,), daemon=True)
         thread.start()
 
-    def _upload_worker(self):
-        title = self.title_entry.get().strip()
-        desc = self.desc_textbox.get("1.0", "end-1c").strip()
-        tags = [t.strip() for t in self.tags_entry.get().split(",") if t.strip()]
-        cat_id = config.CATEGORY_NAME_TO_ID.get(self.cat_menu.get(), "22")
-        privacy = self.privacy_menu.get()
-        kids = self.kids_var.get()
-
-        scheduled_time = None
-        if self.sched_var.get():
-            sched_str = self.sched_entry.get().strip()
-            try:
-                dt = datetime.strptime(sched_str, "%Y-%m-%d %H:%M")
-                scheduled_time = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-            except Exception:
-                pass
-
+    def _upload_worker(self, upload_options):
         def progress_cb(percent, msg):
-            self.prog_bar.set(percent)
-            self.status_lbl.configure(text=msg)
+            def update_progress():
+                self.prog_bar.set(percent)
+                self.status_lbl.configure(text=msg)
+            self.after(0, update_progress)
 
         try:
-            result = upload_video(
-                video_path=self.selected_video_path,
-                title=title,
-                description=desc,
-                tags=tags,
-                category_id=cat_id,
-                privacy_status=privacy,
-                thumbnail_path=self.selected_thumb_path,
-                scheduled_time=scheduled_time,
-                made_for_kids=kids,
-                progress_callback=progress_cb
-            )
+            result = upload_video(**upload_options, progress_callback=progress_cb)
 
-            self.status_lbl.configure(
-                text=f"Video Uploaded! Direct Link: {result['url']}",
-                text_color=COLORS["success"]
-            )
-            messagebox.showinfo("Success", f"Video uploaded successfully!\n\nVideo ID: {result['video_id']}\nURL: {result['url']}")
-            if self.on_upload_success:
-                self.on_upload_success()
+            def on_done():
+                self.status_lbl.configure(
+                    text=f"Video Uploaded! Direct Link: {result['url']}",
+                    text_color=COLORS["success"]
+                )
+                messagebox.showinfo("Success", f"Video uploaded successfully!\n\nVideo ID: {result['video_id']}\nURL: {result['url']}")
+                if self.on_upload_success:
+                    self.on_upload_success()
+            self.after(0, on_done)
 
         except Exception as e:
-            self.status_lbl.configure(text=f"Upload Failed: {str(e)}", text_color=COLORS["danger"])
-            messagebox.showerror("Upload Failed", str(e))
+            def on_fail(error=str(e)):
+                self.status_lbl.configure(text=f"Upload Failed: {error}", text_color=COLORS["danger"])
+                messagebox.showerror("Upload Failed", error)
+            self.after(0, on_fail)
         finally:
-            self.upload_btn.configure(state="normal")
-            self.queue_btn.configure(state="normal")
+            def enable_buttons():
+                self.upload_btn.configure(state="normal")
+                self.queue_btn.configure(state="normal")
+                self.one_click_btn.configure(state="normal")
+            self.after(0, enable_buttons)
 
     def _add_to_queue(self):
         if not self.selected_video_path or not os.path.exists(self.selected_video_path):
@@ -739,14 +769,11 @@ class UploadView(ctk.CTkScrollableFrame):
         privacy = self.privacy_menu.get()
         kids = self.kids_var.get()
 
-        scheduled_time = None
-        if self.sched_var.get():
-            sched_str = self.sched_entry.get().strip()
-            try:
-                dt = datetime.strptime(sched_str, "%Y-%m-%d %H:%M")
-                scheduled_time = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-            except Exception:
-                pass
+        try:
+            scheduled_time = self._get_scheduled_time()
+        except ValueError as exc:
+            messagebox.showerror("Invalid release time", str(exc))
+            return
 
         item = add_to_queue(
             video_path=self.selected_video_path,
