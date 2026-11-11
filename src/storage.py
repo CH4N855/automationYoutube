@@ -121,8 +121,8 @@ def clear_history() -> None:
 DEFAULT_SETTINGS = {
     "default_category_id": "22",  # People & Blogs
     "default_privacy": "public",
-    "default_tags": ["automation", "youtube"],
-    "default_description_footer": "\n\n🔔 Subscribe for more updates!\n👍 Like and share if you found this helpful.",
+    "default_tags": [],
+    "default_description_footer": "",
     "batch_interval_hours": 24,
     "default_made_for_kids": False,
     "default_video_format": "Auto-Detect",

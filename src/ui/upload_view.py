@@ -218,7 +218,7 @@ class UploadView(ctk.CTkScrollableFrame):
 
         # Load default footer from settings
         settings = load_settings()
-        self.desc_textbox.insert("1.0", f"Video description here.{settings.get('default_description_footer', '')}")
+        self.desc_textbox.insert("1.0", settings.get("default_description_footer", ""))
 
         # Tags
         ctk.CTkLabel(right_col, text="Tags (comma separated)", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=15, pady=(5, 2))
@@ -228,7 +228,7 @@ class UploadView(ctk.CTkScrollableFrame):
             height=40
         )
         self.tags_entry.pack(fill="x", padx=15, pady=(0, 10))
-        self.tags_entry.insert(0, ", ".join(settings.get("default_tags", ["automation", "youtube"])))
+        self.tags_entry.insert(0, ", ".join(settings.get("default_tags", [])))
 
         # Category & Privacy
         row_opts = ctk.CTkFrame(right_col, fg_color="transparent")

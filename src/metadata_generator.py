@@ -44,7 +44,7 @@ def clean_topic_from_filename(filename: str) -> str:
     name = re.sub(r'\b(1080p|720p|4k|h264|x264|final|render|part\d*|v\d*|clip|vid)\b', '', name, flags=re.IGNORECASE)
     name = re.sub(r'\s+', ' ', name).strip()
 
-    return name.title() if name else "Amazing Video"
+    return name.title() if name else Path(filename).stem
 
 def read_accompanying_metadata(video_path: str) -> Optional[Dict[str, Any]]:
     """Check for companion script, description, or notes file alongside the video."""
@@ -197,7 +197,7 @@ def auto_generate_video_metadata(
                     break
 
         if not hook_candidate:
-            hook_candidate = f"{clean_fallback}: Must-Watch!"
+            hook_candidate = clean_fallback
 
         # Capitalize Title cleanly
         title = hook_candidate.rstrip(".!?")
@@ -228,8 +228,6 @@ def auto_generate_video_metadata(
                 hashtags.append(tag)
         if "#Facts" not in hashtags and ("facts" in transcript.lower() or "did you know" in transcript.lower()):
             hashtags.append("#Facts")
-        if "#Viral" not in hashtags and len(hashtags) < 7:
-            hashtags.append("#Viral")
 
         # 4. Tags
         tags = []
@@ -240,7 +238,6 @@ def auto_generate_video_metadata(
                 tags.append(kw)
         if clean_fallback.lower() not in tags:
             tags.insert(0, clean_fallback.lower())
-        tags.extend(["viral", "trending", "youtube", "2026"])
 
         # 5. Formatted Description
         description_lines = [
@@ -253,13 +250,7 @@ def auto_generate_video_metadata(
         if len(sentences) > 2:
             description_lines.append(f"• {sentences[2]}")
 
-        description_lines.extend([
-            "",
-            "🔔 Don't forget to LIKE and SUBSCRIBE for more daily content!",
-            "💬 Leave a comment below with your thoughts and feedback.",
-            "",
-            " ".join(hashtags)
-        ])
+        description_lines.extend(["", " ".join(hashtags)])
         description = "\n".join(description_lines)
 
     else:
@@ -286,70 +277,23 @@ def auto_generate_video_metadata(
     }
 
 def generate_seo_metadata(topic: str, video_type: str = "Standard") -> Dict[str, Any]:
-    """
-    Generate high-converting titles, formatted SEO descriptions, and tags.
-    """
-    topic_clean = topic.strip() or "YouTube Video"
-    keywords = [w.lower() for w in re.findall(r'\b\w+\b', topic_clean) if len(w) > 2 and w.lower() not in STOPWORDS]
-
+    """Derive metadata only from the supplied topic, without invented claims."""
+    topic_clean = topic.strip()
+    if not topic_clean:
+        raise ValueError("Enter a topic to generate metadata.")
+    keywords = extract_keywords(topic_clean)
+    title = topic_clean[:90]
     if video_type == "Short":
-        titles = [
-            f"The Ultimate {topic_clean} Hack! #Shorts",
-            f"Don't Make This {topic_clean} Mistake 😱 #Shorts",
-            f"Wait for the end... {topic_clean} #Shorts",
-            f"Quick {topic_clean} in 60 Seconds! ⚡ #Shorts",
-            f"Why Everyone is Talking About {topic_clean} #Shorts"
-        ]
-    else:
-        titles = [
-            f"How to Master {topic_clean} (Step-by-Step Guide)",
-            f"The Truth About {topic_clean} in 2026",
-            f"{topic_clean} Masterclass: Everything You Need to Know",
-            f"I Tried {topic_clean} So You Don't Have To",
-            f"Top 5 Secrets for {topic_clean} You Must Know"
-        ]
-
-    description = (
-        f"In this video, we dive deep into {topic_clean}! Learn everything you need to know "
-        f"with clear explanations, practical tips, and actionable takeaways.\n\n"
-        f"📌 TIMESTAMPS / CHAPTERS:\n"
-        f"0:00 - Introduction to {topic_clean}\n"
-        f"1:15 - Key Concepts & Essentials\n"
-        f"3:45 - Step-by-Step Walkthrough\n"
-        f"6:30 - Common Mistakes to Avoid\n"
-        f"8:20 - Summary & Final Tips\n\n"
-        f"💡 KEY TAKEAWAYS:\n"
-        f"• The foundational principles of {topic_clean}\n"
-        f"• How to get results faster and avoid common pitfalls\n"
-        f"• Best practices and recommendations for 2026\n\n"
-        f"🔔 Don't forget to LIKE, SUBSCRIBE, and ring the bell for more tutorials!\n"
-        f"💬 Leave a comment below with your questions or what you want to see next."
-    )
-
-    base_tags = [
-        topic_clean.lower(),
-        f"{topic_clean.lower()} tutorial",
-        f"{topic_clean.lower()} guide",
-        f"how to {topic_clean.lower()}",
-        f"{topic_clean.lower()} 2026",
-        "tutorial",
-        "guide",
-        "tips and tricks",
-        "best practices"
-    ]
-    for kw in keywords:
-        if kw not in base_tags:
-            base_tags.append(kw)
-
+        title += " #Shorts"
+    tags = list(dict.fromkeys([topic_clean.lower(), *keywords]))[:20]
     hashtags = [f"#{kw.capitalize()}" for kw in keywords[:5]]
-    if "#YouTube" not in hashtags:
-        hashtags.append("#YouTube")
-
+    if video_type == "Short":
+        hashtags.insert(0, "#Shorts")
     return {
-        "titles": titles,
-        "recommended_title": titles[0],
-        "description": description,
-        "tags": base_tags[:20],
-        "tags_csv": ", ".join(base_tags[:20]),
-        "hashtags": " ".join(hashtags)
+        "titles": [title],
+        "recommended_title": title,
+        "description": topic_clean,
+        "tags": tags,
+        "tags_csv": ", ".join(tags),
+        "hashtags": " ".join(hashtags),
     }

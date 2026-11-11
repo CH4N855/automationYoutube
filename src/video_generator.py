@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
 import config
-from src.video_templates import FACT_TEMPLATES, select_template_for_niche
+from src.metadata_generator import extract_keywords, classify_category
 import edge_tts
 from PIL import Image, ImageDraw, ImageFont
 
@@ -90,7 +90,7 @@ def create_ai_video(
 ) -> Dict[str, Any]:
     """
     Automated generation of YouTube Short (9:16 vertical) or Long-Form Video (16:9 widescreen):
-    1. Selects or formats the script matching the requested niche & format.
+    1. Uses the required user-supplied narration script.
     2. Generates realistic AI voiceover with the selected voice via edge-tts.
     3. Assembles video with burned captions in 9:16 or 16:9.
     4. Generates an eye-catching matching thumbnail (9:16 or 16:9).
@@ -103,49 +103,25 @@ def create_ai_video(
     audio_path = str(GENERATED_DIR / f"audio_{timestamp}.mp3")
     video_path = str(GENERATED_DIR / video_filename)
 
-    template = select_template_for_niche(topic_or_niche)
+    if not custom_script or not custom_script.strip():
+        raise ValueError("Provide a script before generating a video.")
+    script_text = custom_script.strip()
+    title = ((topic_or_niche or "").strip() or script_text.splitlines()[0])[:90]
+    desc = script_text
+    tags = extract_keywords(script_text)
 
     if is_short:
         width, height = 1080, 1920
         aspect = "9:16"
         sub_style = "FontName=Arial,FontSize=20,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=300"
-        thumb_sub = "VIRAL SHORTS"
-        if custom_script:
-            script_text = custom_script
-            title = f"{topic_or_niche or 'Did You Know?'} #Shorts"
-        else:
-            script_text = f"{template['hook']}. First: {template['points'][0]}. Next: {template['points'][1]}. Finally: {template['points'][2]}. Follow for more daily facts!"
-            title = f"{template['hook'].replace('!', '')} 🤯 #Shorts"
-        desc = f"{script_text}\n\n🔔 Subscribe for daily mind-blowing shorts!\n#Shorts #Facts #Viral #Learn"
-        tags = ["shorts", "facts", "viral", "didyouknow", "motivation", "daily"]
+        thumb_sub = ""
+        title += " #Shorts"
+        tags = ["shorts", *tags]
     else:
         width, height = 1920, 1080
         aspect = "16:9"
         sub_style = "FontName=Arial,FontSize=26,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Alignment=2,MarginV=90"
-        thumb_sub = "MUST WATCH"
-        if custom_script:
-            script_text = custom_script
-            title = f"{topic_or_niche or 'Did You Know?'} - Full Guide"
-        else:
-            script_text = (
-                f"Welcome to today's deep dive into {template['niche']}. {template['hook']} "
-                f"Let's explore our first key insight: {template['points'][0]} "
-                f"Moving on to our second crucial fact: {template['points'][1]} "
-                f"And finally, the most extraordinary point of all: {template['points'][2]} "
-                f"Thank you for watching this full episode. Make sure to hit subscribe and leave a comment below with your thoughts!"
-            )
-            title = f"{template['hook'].replace('!', '')} (Full Episode)"
-        desc = (
-            f"{script_text}\n\n"
-            f"📌 CHAPTERS / TIMESTAMPS:\n"
-            f"0:00 - Introduction & Hook\n"
-            f"0:15 - Point 1: Deep Dive\n"
-            f"0:45 - Point 2: Key Analysis\n"
-            f"1:15 - Point 3: The Final Takeaway\n\n"
-            f"🔔 Subscribe to our channel for more comprehensive long-form videos!\n"
-            f"#Documentary #Facts #Learning #Education"
-        )
-        tags = ["youtube", "facts", "documentary", "guide", "education", "deep dive", "learning"]
+        thumb_sub = ""
 
     if progress_callback:
         progress_callback(0.15, "Generating AI Voiceover...")
@@ -211,7 +187,7 @@ def create_ai_video(
         "title": title[:100],
         "description": desc,
         "tags": tags,
-        "category_id": "27",
+        "category_id": classify_category(script_text),
         "is_short": is_short
     }
 

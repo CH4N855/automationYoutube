@@ -67,7 +67,7 @@ class SettingsView(ctk.CTkScrollableFrame):
         # Default Tags
         ctk.CTkLabel(presets_card, text="Default Tags (comma separated)", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=15, pady=(10, 2))
         self.def_tags_entry = ctk.CTkEntry(presets_card, height=40)
-        self.def_tags_entry.insert(0, ", ".join(settings.get("default_tags", ["automation", "youtube"])))
+        self.def_tags_entry.insert(0, ", ".join(settings.get("default_tags", [])))
         self.def_tags_entry.pack(fill="x", padx=15, pady=(0, 10))
 
         # Default Description Footer

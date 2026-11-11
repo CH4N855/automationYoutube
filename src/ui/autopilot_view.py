@@ -24,18 +24,22 @@ class AutoPilotView(ctk.CTkScrollableFrame):
                      text_color=COLORS["muted"], font=ctk.CTkFont(size=14)).pack(anchor="w")
 
         gen_card = self._card("01 / CREATE", "Make your next video",
-                              "Choose a topic, voice, and format. We will create a script, narration, and video.")
+                              "Enter your script, then choose a voice and format for narration and video.")
         row = ctk.CTkFrame(gen_card, fg_color="transparent")
         row.pack(fill="x", padx=24, pady=(8, 16))
         row.grid_columnconfigure((0, 1, 2), weight=1, uniform="fields")
-        for col, label in enumerate(("Content niche", "Narration voice", "Video format")):
+        for col, label in enumerate(("Video title (optional)", "Narration voice", "Video format")):
             ctk.CTkLabel(row, text=label, font=ctk.CTkFont(size=13, weight="bold")).grid(row=0, column=col, sticky="w", pady=(0, 8))
-        self.niche_menu = ctk.CTkOptionMenu(row, height=44, values=["Space & Science", "Psychology & Motivation", "Unbelievable History", "Productivity & Life Hacks", "Random Viral Facts"])
+        self.niche_menu = ctk.CTkEntry(row, height=44)
         self.niche_menu.grid(row=1, column=0, sticky="ew", padx=(0, 8))
         self.voice_menu = ctk.CTkOptionMenu(row, height=44, values=["Ryan (Energetic Male)", "Christopher (Authoritative)", "Jenny (Natural Female)", "Sonia (British Female)"])
         self.voice_menu.grid(row=1, column=1, sticky="ew", padx=(4, 8))
         self.format_menu = ctk.CTkOptionMenu(row, height=44, values=["YouTube Short (9:16 Vertical)", "YouTube Long Video (16:9 Widescreen)"], command=self._on_format_changed)
         self.format_menu.grid(row=1, column=2, sticky="ew", padx=(8, 0))
+
+        ctk.CTkLabel(gen_card, text="Narration script (required)", font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w", padx=24)
+        self.script_box = ctk.CTkTextbox(gen_card, height=140)
+        self.script_box.pack(fill="x", padx=24, pady=(8, 16))
 
         self.instant_btn = ctk.CTkButton(gen_card, text="⚡ Generate & publish Short", height=48,
                                          fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"],
@@ -45,7 +49,7 @@ class AutoPilotView(ctk.CTkScrollableFrame):
                      text_color=COLORS["muted"], font=ctk.CTkFont(size=12), wraplength=680).pack(anchor="w", padx=24, pady=(0, 20))
 
         daily = self._card("02 / AUTOMATE", "Build a daily rhythm",
-                           "Create and publish one Short each day while this app is running, including in the tray.")
+                           "Publish a video using the supplied script each day while this app is running.")
         row = ctk.CTkFrame(daily, fg_color="transparent")
         row.pack(fill="x", padx=24, pady=(8, 24))
         row.grid_columnconfigure((0, 1), weight=1, uniform="fields")
@@ -82,6 +86,11 @@ class AutoPilotView(ctk.CTkScrollableFrame):
         self.instant_btn.configure(text=btn_text)
 
     def _trigger_instant_generation(self):
+        custom_script = self.script_box.get("1.0", "end-1c").strip()
+        if not custom_script:
+            messagebox.showerror("Script required", "Enter a narration script first.")
+            self.script_box.focus_set()
+            return
         niche, voice = self.niche_menu.get(), self.voice_menu.get()
         format_choice = self.format_menu.get()
         format_type = "short" if "short" in format_choice.lower() else "long"
@@ -110,7 +119,7 @@ class AutoPilotView(ctk.CTkScrollableFrame):
 
         def worker():
             try:
-                res = autopilot.generate_and_post_video_now(niche=niche, voice=voice, format_type=format_type)
+                res = autopilot.generate_and_post_video_now(niche=niche, voice=voice, format_type=format_type, custom_script=custom_script)
             except Exception as exc:
                 res = {"success": False, "error": str(exc)}
             self.after(0, lambda: complete(res))
@@ -119,6 +128,12 @@ class AutoPilotView(ctk.CTkScrollableFrame):
 
     def _toggle_daily_autopilot(self):
         if self.daily_switch_var.get():
+            custom_script = self.script_box.get("1.0", "end-1c").strip()
+            if not custom_script:
+                self.daily_switch_var.set(False)
+                messagebox.showerror("Script required", "Enter a narration script first.")
+                self.script_box.focus_set()
+                return
             hour_str = self.hour_menu.get().split(":")[0]
             try:
                 hour = int(hour_str)
@@ -127,7 +142,7 @@ class AutoPilotView(ctk.CTkScrollableFrame):
             niche = self.niche_menu.get()
             voice = self.voice_menu.get()
             format_type = "short" if "short" in self.format_menu.get().lower() else "long"
-            autopilot.start_daily_automation(post_hour=hour, niche=niche, voice=voice, format_type=format_type)
+            autopilot.start_daily_automation(post_hour=hour, niche=niche, voice=voice, format_type=format_type, custom_script=custom_script)
         else:
             autopilot.stop_daily_automation()
 

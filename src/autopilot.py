@@ -27,14 +27,15 @@ class AutoPilotEngine:
         self,
         niche: Optional[str] = None,
         voice: Optional[str] = None,
-        format_type: str = "short"
+        format_type: str = "short",
+        custom_script: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate a complete AI video (Short or Long) and upload it directly to YouTube."""
         mode_label = "YouTube Short (9:16)" if str(format_type).lower() == "short" else "YouTube Long Video (16:9)"
         self._log(f"⚡ Starting 100% Automated {mode_label} Generation...")
 
         try:
-            video_data = create_ai_video(topic_or_niche=niche, voice=voice, format_type=format_type)
+            video_data = create_ai_video(topic_or_niche=niche, voice=voice, format_type=format_type, custom_script=custom_script)
             self._log(f"🎬 Video created: {video_data['title']}")
         except Exception as e:
             self._log(f"❌ Video generation error: {e}")
@@ -73,22 +74,25 @@ class AutoPilotEngine:
             self._log(f"❌ Upload error: {e}")
             return {"success": False, "error": str(e)}
 
-    def generate_and_post_short_now(self, niche: Optional[str] = None, voice: Optional[str] = None) -> Dict[str, Any]:
+    def generate_and_post_short_now(self, niche: Optional[str] = None, voice: Optional[str] = None, custom_script: Optional[str] = None) -> Dict[str, Any]:
         """Backwards compatibility for 9:16 Shorts."""
-        return self.generate_and_post_video_now(niche=niche, voice=voice, format_type="short")
+        return self.generate_and_post_video_now(niche=niche, voice=voice, format_type="short", custom_script=custom_script)
 
     def start_daily_automation(
         self,
         post_hour: int = 18,
         niche: Optional[str] = None,
         voice: Optional[str] = None,
-        format_type: str = "short"
+        format_type: str = "short",
+        custom_script: Optional[str] = None
     ):
         """Schedule 1 automated video generation and posting every day."""
         if self._recurring_active:
             return
+        if not custom_script or not custom_script.strip():
+            raise ValueError("Provide a script before enabling daily publishing.")
         self._recurring_active = True
-        self._thread = threading.Thread(target=self._daily_loop, args=(post_hour, niche, voice, format_type), daemon=True)
+        self._thread = threading.Thread(target=self._daily_loop, args=(post_hour, niche, voice, format_type, custom_script), daemon=True)
         self._thread.start()
         mode_label = "Shorts" if format_type == "short" else "Long Videos"
         self._log(f"🟢 Daily Auto-Pilot activated for {mode_label}. Will post every day at {post_hour:02d}:00.")
@@ -100,7 +104,7 @@ class AutoPilotEngine:
     def is_active(self) -> bool:
         return self._recurring_active
 
-    def _daily_loop(self, post_hour: int, niche: Optional[str] = None, voice: Optional[str] = None, format_type: str = "short"):
+    def _daily_loop(self, post_hour: int, niche: Optional[str] = None, voice: Optional[str] = None, format_type: str = "short", custom_script: Optional[str] = None):
         last_posted_day = None
 
         while self._recurring_active:
@@ -111,7 +115,7 @@ class AutoPilotEngine:
                 # Check if it's the target hour and we haven't posted today
                 if now.hour == post_hour and last_posted_day != today_str:
                     self._log(f"⏰ Daily trigger time reached ({now.strftime('%H:%M')}). Generating & Posting...")
-                    res = self.generate_and_post_video_now(niche=niche, voice=voice, format_type=format_type)
+                    res = self.generate_and_post_video_now(niche=niche, voice=voice, format_type=format_type, custom_script=custom_script)
                     if res.get("success"):
                         last_posted_day = today_str
                     else:

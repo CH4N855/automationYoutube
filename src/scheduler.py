@@ -129,7 +129,7 @@ class SchedulerDaemon:
             current_time = start_datetime.astimezone(timezone.utc)
 
         for index, vpath in enumerate(video_paths):
-            title = f"{base_title} - Part {index + 1}" if len(video_paths) > 1 else base_title
+            title = (f"{base_title} - Part {index + 1}" if len(video_paths) > 1 else base_title) if base_title else os.path.splitext(os.path.basename(vpath))[0]
             iso_time = current_time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
             item = add_to_queue(

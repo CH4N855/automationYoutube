@@ -7,13 +7,13 @@ A modern, standalone Windows desktop application built with **Python & CustomTki
 ## 🤖 100% Full Auto-Pilot Capabilities
 
 ### 1. ⚡ 1-Click AI Video Creation & Auto-Posting
-- Pick a content niche (*Space & Science*, *Psychology & Motivation*, *History*, *Productivity*, or *Random Viral Facts*).
+- Enter your narration script and an optional video title.
 - Select an ultra-realistic neural voice (*Ryan, Christopher, Jenny, Sonia* via `edge-tts`).
 - Click **"🚀 Generate & Post AI Short to YouTube Now"**:
-  1. Automatically writes an engaging, viral script.
+  1. Uses your supplied narration script (required).
   2. Synthesizes human-like neural voiceover audio.
   3. Renders a vertical 1080x1920 YouTube Short with dynamic visual backgrounds.
-  4. Generates high-ranking SEO titles, descriptions, and tags.
+  4. Derives titles, descriptions, and tags from your supplied content.
   5. Uploads and publishes straight to your connected YouTube channel!
 
 ### 2. 📅 24/7 Daily Recurring Auto-Pilot
@@ -28,7 +28,7 @@ A modern, standalone Windows desktop application built with **Python & CustomTki
 
 ### 4. ✨ AI SEO & Metadata Helper
 - Generate 5 clickable high-converting viral title ideas with one click.
-- Auto-generates structured descriptions with chapters/timestamps and top 20 search tags.
+- Derives metadata from transcripts or filenames without fabricated chapters or promotional claims.
 
 ### 5. 🔄 Autonomous Git Auto-Push Agent
 - Background agent (`src/git_autopush.py` or double-click `run_autopush.bat`) automatically watches the workspace.

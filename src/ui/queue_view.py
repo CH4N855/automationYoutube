@@ -245,13 +245,11 @@ class QueueView(ctk.CTkFrame):
 
         # Metadata options
         ctk.CTkLabel(container, text="Base Video Title", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(5, 2))
-        self.batch_title_entry = ctk.CTkEntry(container, placeholder_text="Daily Automation Video", height=40)
-        self.batch_title_entry.insert(0, "Daily Automation Series")
+        self.batch_title_entry = ctk.CTkEntry(container, placeholder_text="Leave blank to use filenames", height=40)
         self.batch_title_entry.pack(fill="x", pady=(0, 8))
 
         ctk.CTkLabel(container, text="Description", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", pady=(5, 2))
         self.batch_desc_entry = ctk.CTkTextbox(container, height=80)
-        self.batch_desc_entry.insert("1.0", "New episode automated with YouTube Studio Automator.\nSubscribe for more!")
         self.batch_desc_entry.pack(fill="x", pady=(0, 8))
 
         # Timing
@@ -318,7 +316,7 @@ class QueueView(ctk.CTkFrame):
             video_paths=self.batch_video_paths,
             base_title=base_title,
             description=desc,
-            tags=["automation", "series"],
+            tags=[],
             category_id="22",
             privacy_status="public",
             start_datetime=start_dt,
