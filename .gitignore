@@ -1,3 +1,7 @@
+# Tests and test scripts
+tests/
+test*.py
+
 # Playwright MCP artifacts
 .playwright-mcp/
 gcm_out.txt

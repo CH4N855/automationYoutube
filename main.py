@@ -16,7 +16,7 @@ from src.storage import load_queue
 from src.scheduler import scheduler
 from src.folder_watcher import folder_watcher
 
-from src.ui.theme import COLORS, configure_theme
+from src.ui.theme import COLORS, configure_theme, enable_button_keyboard_navigation
 
 from src.ui.upload_view import UploadView
 from src.ui.queue_view import QueueView
@@ -151,6 +151,8 @@ class YouTubeAutomatorApp(ctk.CTk):
                     view.refresh_history()
             else:
                 view.grid_forget()
+
+        enable_button_keyboard_navigation(self)
 
     def update_channel_badge(self):
         if is_authenticated():
