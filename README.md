@@ -30,6 +30,10 @@ A modern, standalone Windows desktop application built with **Python & CustomTki
 - Generate 5 clickable high-converting viral title ideas with one click.
 - Auto-generates structured descriptions with chapters/timestamps and top 20 search tags.
 
+### 5. 🔄 Autonomous Git Auto-Push Agent
+- Background agent (`src/git_autopush.py` or double-click `run_autopush.bat`) automatically watches the workspace.
+- Whenever any code file is edited or saved, it automatically stages, commits, and pushes to GitHub within seconds while strictly protecting sensitive secrets.
+
 ---
 
 ## 🚀 How to Run
