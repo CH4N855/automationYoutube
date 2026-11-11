@@ -103,13 +103,37 @@ class FolderWatcher:
             tags = settings.get("default_tags", ["automation"])
             category_id = settings.get("default_category_id", "22")
 
-        add_to_queue(
+        # Automatically check for companion thumbnail or auto-generate a high-CTR thumbnail
+        thumb_path = None
+        base_no_ext = os.path.splitext(video_path)[0]
+        for ext in [".jpg", ".jpeg", ".png", ".webp"]:
+            possible_thumb = base_no_ext + ext
+            if os.path.exists(possible_thumb):
+                thumb_path = possible_thumb
+                break
+
+        if not thumb_path:
+            try:
+                from src.thumbnail_generator import generate_youtube_thumbnail
+                is_short = meta.get("is_short", False) if "meta" in locals() else False
+                aspect = "9:16" if is_short else "16:9"
+                thumb_path = generate_youtube_thumbnail(
+                    title=title,
+                    subtitle="SHORTS" if is_short else "MUST WATCH",
+                    aspect_ratio=aspect
+                )
+            except Exception as e:
+                print(f"Thumbnail generation notice: {e}")
+                thumb_path = None
+
+        item = add_to_queue(
             video_path=video_path,
             title=title,
             description=description,
             tags=tags,
             category_id=category_id,
             privacy_status=settings.get("default_privacy", "public"),
+            thumbnail_path=thumb_path,
             made_for_kids=settings.get("default_made_for_kids", False)
         )
 
@@ -118,5 +142,13 @@ class FolderWatcher:
 
         if self._on_video_detected:
             self._on_video_detected(video_path)
+
+        # 1-Click / Zero-Click Auto-Upload immediately if enabled
+        if settings.get("watch_folder_auto_upload", True):
+            try:
+                from src.scheduler import scheduler
+                scheduler.process_item(item["id"])
+            except Exception as e:
+                print(f"Watch folder auto-upload notice: {e}")
 
 folder_watcher = FolderWatcher()

@@ -7,6 +7,7 @@ from src.ui.theme import COLORS
 
 from src.storage import load_queue, remove_from_queue
 from src.scheduler import scheduler
+from src.youtube_auth import is_authenticated
 import config
 
 class QueueView(ctk.CTkFrame):
@@ -58,15 +59,26 @@ class QueueView(ctk.CTkFrame):
         )
         self.queue_count_lbl.pack(side="left")
 
+        self.upload_all_btn = ctk.CTkButton(
+            top_bar,
+            text="⚡ Upload All in Queue",
+            width=160,
+            command=self._upload_all_now,
+            fg_color=COLORS["accent"],
+            hover_color=COLORS["accent_hover"],
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.upload_all_btn.pack(side="right", padx=(5, 0))
+
         refresh_btn = ctk.CTkButton(
             top_bar,
             text="Refresh",
-            width=90,
+            width=80,
             command=self.refresh_queue,
             fg_color=COLORS["raised"],
             hover_color=COLORS["secondary_hover"]
         )
-        refresh_btn.pack(side="right", padx=(5, 0))
+        refresh_btn.pack(side="right", padx=(5, 5))
 
         # Scrollable list for cards
         self.queue_scroll = ctk.CTkScrollableFrame(self.tab_queue, fg_color=COLORS["bg"])
@@ -171,6 +183,35 @@ class QueueView(ctk.CTkFrame):
             del_btn.pack(side="left", padx=5)
             if status == "UPLOADING":
                 del_btn.configure(state="disabled")
+
+    def _upload_all_now(self):
+        queue = load_queue()
+        pending = [it for it in queue if it.get("status") in ["queued", "failed"]]
+        if not pending:
+            messagebox.showinfo("Queue Empty", "No pending or failed videos in queue to upload.")
+            return
+
+        if not is_authenticated():
+            messagebox.showerror("Error", "YouTube account is not connected. Go to 'Settings & Channel' to connect.")
+            return
+
+        self.upload_all_btn.configure(state="disabled", text="Uploading Queue...")
+
+        def worker():
+            for item in pending:
+                scheduler.process_item(item["id"])
+                self.after(0, self.refresh_queue)
+
+            def done():
+                self.upload_all_btn.configure(state="normal", text="⚡ Upload All in Queue")
+                self.refresh_queue()
+                if self.on_queue_change:
+                    self.on_queue_change()
+                messagebox.showinfo("Success", "All videos in queue have been processed!")
+
+            self.after(0, done)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _upload_single_now(self, item_id: str):
         def complete(res):

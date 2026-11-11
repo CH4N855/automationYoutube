@@ -4,6 +4,7 @@ import customtkinter as ctk
 from src.ui.theme import COLORS
 
 from src.folder_watcher import folder_watcher
+from src.storage import load_settings, save_settings
 import config
 
 class FolderView(ctk.CTkFrame):
@@ -84,7 +85,20 @@ class FolderView(ctk.CTkFrame):
             command=self._toggle_watcher,
             progress_color=COLORS["accent"]
         )
-        self.toggle_switch.pack(anchor="w", padx=15, pady=(10, 15))
+        self.toggle_switch.pack(anchor="w", padx=15, pady=(10, 8))
+
+        # Instant Auto-Upload switch
+        settings = load_settings()
+        self.auto_upload_var = ctk.BooleanVar(value=settings.get("watch_folder_auto_upload", True))
+        self.auto_upload_switch = ctk.CTkSwitch(
+            card,
+            text="⚡ Instant Auto-Upload (Publish to YouTube automatically on detection)",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            variable=self.auto_upload_var,
+            command=self._toggle_auto_upload,
+            progress_color=COLORS["success"]
+        )
+        self.auto_upload_switch.pack(anchor="w", padx=15, pady=(0, 15))
 
         # Explanation box
         info_box = ctk.CTkFrame(card, fg_color=COLORS["bg"], corner_radius=8)
@@ -127,6 +141,13 @@ class FolderView(ctk.CTkFrame):
         else:
             os.makedirs(path, exist_ok=True)
             os.startfile(path)
+
+    def _toggle_auto_upload(self):
+        settings = load_settings()
+        settings["watch_folder_auto_upload"] = self.auto_upload_var.get()
+        save_settings(settings)
+        state_str = "Enabled" if self.auto_upload_var.get() else "Disabled"
+        self.log_box.insert("end", f" Instant Auto-Upload on video detection is now {state_str}.\n")
 
     def _toggle_watcher(self):
         if self.toggle_var.get():
