@@ -100,29 +100,47 @@ class QueueView(ctk.CTkFrame):
 
             # Left Info
             info_frame = ctk.CTkFrame(card, fg_color="transparent")
-            info_frame.grid(row=0, column=0, sticky="w", padx=12, pady=10)
+            info_frame.grid(row=0, column=0, sticky="ew", padx=16, pady=16)
 
             title_text = item.get("title", "Untitled")
             status = item.get("status", "queued").upper()
-            status_color = COLORS["warning"] if status in ["QUEUED", "SCHEDULED"] else (COLORS["success"] if status == "UPLOADED" else COLORS["danger"])
+            status_color = {
+                "QUEUED": COLORS["warning"], "SCHEDULED": COLORS["warning"],
+                "UPLOADING": COLORS["muted"], "UPLOADED": COLORS["success"],
+            }.get(status, COLORS["danger"])
 
-            ctk.CTkLabel(
+            ctk.CTkLabel(info_frame, text=status, text_color=status_color,
+                         font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w")
+
+            title_label = ctk.CTkLabel(
                 info_frame,
                 text=title_text,
                 font=ctk.CTkFont(size=14, weight="bold"),
-                anchor="w"
-            ).pack(anchor="w")
+                anchor="w", justify="left", wraplength=420
+            )
+            title_label.pack(anchor="w")
 
             filename = os.path.basename(item.get("video_path", ""))
-            sched_time = item.get("scheduled_time", "Not scheduled (Immediate)")
-            meta_str = f" {filename}  |  ⏰ Scheduled: {sched_time}  |  Privacy: {item.get('privacy_status')}"
-            ctk.CTkLabel(
+            sched_time = item.get("scheduled_time") or "Immediate"
+            meta_str = f"{filename}  |  Scheduled: {sched_time}  |  Privacy: {item.get('privacy_status')}"
+            meta_label = ctk.CTkLabel(
                 info_frame,
                 text=meta_str,
                 text_color=COLORS["muted"],
                 font=ctk.CTkFont(size=12),
-                anchor="w"
-            ).pack(anchor="w", pady=(2, 0))
+                anchor="w", justify="left", wraplength=420
+            )
+            meta_label.pack(anchor="w", pady=(4, 0))
+            labels = [title_label, meta_label]
+            if item.get("error_message"):
+                error_label = ctk.CTkLabel(
+                    info_frame, text=f"Last attempt: {item['error_message']}",
+                    text_color=COLORS["danger"], justify="left", wraplength=420,
+                    font=ctk.CTkFont(size=12))
+                error_label.pack(anchor="w", pady=(8, 0))
+                labels.append(error_label)
+            info_frame.bind("<Configure>", lambda event, targets=labels: [
+                label.configure(wraplength=max(160, event.width - 8)) for label in targets])
 
             # Right actions
             action_frame = ctk.CTkFrame(card, fg_color="transparent")
@@ -130,7 +148,7 @@ class QueueView(ctk.CTkFrame):
 
             up_btn = ctk.CTkButton(
                 action_frame,
-                text="Upload Now",
+                text="Retry upload" if status == "FAILED" else "Upload now",
                 width=100,
                 height=40,
                 fg_color=COLORS["accent"],
@@ -138,6 +156,8 @@ class QueueView(ctk.CTkFrame):
                 command=lambda i=item["id"]: self._upload_single_now(i)
             )
             up_btn.pack(side="left", padx=5)
+            if status == "UPLOADING":
+                up_btn.configure(state="disabled", text="Uploading...")
 
             del_btn = ctk.CTkButton(
                 action_frame,
@@ -149,10 +169,11 @@ class QueueView(ctk.CTkFrame):
                 command=lambda i=item["id"]: self._remove_item(i)
             )
             del_btn.pack(side="left", padx=5)
+            if status == "UPLOADING":
+                del_btn.configure(state="disabled")
 
     def _upload_single_now(self, item_id: str):
-        def worker():
-            res = scheduler.process_item(item_id)
+        def complete(res):
             if res.get("success"):
                 messagebox.showinfo("Success", "Video uploaded successfully!")
             else:
@@ -160,6 +181,10 @@ class QueueView(ctk.CTkFrame):
             self.refresh_queue()
             if self.on_queue_change:
                 self.on_queue_change()
+
+        def worker():
+            res = scheduler.process_item(item_id)
+            self.after(0, lambda: complete(res))
 
         threading.Thread(target=worker, daemon=True).start()
 

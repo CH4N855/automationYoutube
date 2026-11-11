@@ -1,5 +1,9 @@
-# Python
-__pycache__/
+# Playwright MCP artifacts
+.playwright-mcp/
+gcm_out.txt
+test_write.py
+test.txt
+
 *.py[cod]
 *$py.class
 *.so

@@ -62,7 +62,7 @@ class UploadView(ctk.CTkScrollableFrame):
         # Video picker button
         self.video_btn = ctk.CTkButton(
             left_col,
-            text="Browse Video File (.mp4, .mov, .mkv)...",
+            text="Choose video file...",
             command=self._choose_video,
             fg_color=COLORS["raised"],
             hover_color=COLORS["secondary_hover"],
@@ -149,6 +149,24 @@ class UploadView(ctk.CTkScrollableFrame):
         # ----------------- RIGHT COLUMN: Metadata -----------------
         right_col = ctk.CTkFrame(content_frame, fg_color=COLORS["surface"], corner_radius=10)
         right_col.grid(row=0, column=1, sticky="nsew", padx=(10, 0), pady=0)
+
+        layout_state = {"compact": None}
+
+        def adapt_columns(event):
+            compact = event.width < 840
+            if compact == layout_state["compact"]:
+                return
+            layout_state["compact"] = compact
+            if compact:
+                content_frame.grid_columnconfigure(1, weight=0)
+                left_col.grid_configure(row=0, column=0, padx=0, pady=(0, 16))
+                right_col.grid_configure(row=1, column=0, padx=0)
+            else:
+                content_frame.grid_columnconfigure(1, weight=1)
+                left_col.grid_configure(row=0, column=0, padx=(0, 8), pady=0)
+                right_col.grid_configure(row=0, column=1, padx=(8, 0))
+
+        content_frame.bind("<Configure>", adapt_columns)
 
         ctk.CTkLabel(
             right_col,

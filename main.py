@@ -111,7 +111,7 @@ class YouTubeAutomatorApp(ctk.CTk):
         self.sched_status_lbl = ctk.CTkLabel(bottom, text="Scheduler ready", text_color=COLORS["success"],
                                             font=ctk.CTkFont(size=12, weight="bold"))
         self.sched_status_lbl.pack(anchor="w", padx=8)
-        ctk.CTkLabel(bottom, text="Checks queue every 30 seconds", text_color=COLORS["muted"],
+        ctk.CTkLabel(bottom, text="Ctrl+1-6 to switch pages", text_color=COLORS["muted"],
                      font=ctk.CTkFont(size=11)).pack(anchor="w", padx=8)
         ctk.CTkButton(bottom, text="Minimize to tray", height=40, fg_color=COLORS["raised"],
                        command=self.minimize_to_tray).pack(fill="x", pady=(12, 0))
@@ -166,9 +166,12 @@ class YouTubeAutomatorApp(ctk.CTk):
             self.channel_sub_lbl.configure(text="Click Settings to sign in")
 
         q_count = len(load_queue())
-        self.nav_btns["queue"].configure(text=f"Batch & Queue ({q_count})" if q_count > 0 else "  Batch & Queue")
+        self.nav_btns["queue"].configure(text=f"Batch & Queue ({q_count})" if q_count > 0 else "Batch & Queue")
 
     def _on_queue_data_changed(self):
+        if threading.current_thread() is not threading.main_thread():
+            self.after(0, self._on_queue_data_changed)
+            return
         self.update_channel_badge()
         if "queue" in self.views and hasattr(self.views["queue"], "refresh_queue"):
             self.views["queue"].refresh_queue()
