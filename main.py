@@ -24,6 +24,7 @@ from src.ui.folder_view import FolderView
 from src.ui.history_view import HistoryView
 from src.ui.settings_view import SettingsView
 from src.ui.autopilot_view import AutoPilotView
+from src.ui.download_view import DownloadView
 from src.autopilot import autopilot
 
 def create_tray_image(size=(64, 64)):
@@ -93,7 +94,8 @@ class YouTubeAutomatorApp(ctk.CTk):
         self.nav_btns = {}
         nav_items = [("autopilot", "Auto-Pilot Studio"), ("upload", "New Upload"),
                      ("queue", "Batch & Queue"), ("folder", "Folder Watcher"),
-                     ("history", "Upload History"), ("settings", "Settings & Channel")]
+                     ("history", "Upload History"), ("settings", "Settings & Channel"),
+                     ("download", "Download Media")]
         for index, (key, label) in enumerate(nav_items, 1):
             btn = ctk.CTkButton(self.sidebar, text=label, anchor="w", height=44,
                                 border_spacing=14, font=ctk.CTkFont(size=14),
@@ -116,7 +118,7 @@ class YouTubeAutomatorApp(ctk.CTk):
         self.sched_status_lbl = ctk.CTkLabel(bottom, text="Scheduler ready", text_color=COLORS["success"],
                                             font=ctk.CTkFont(size=12, weight="bold"))
         self.sched_status_lbl.pack(anchor="w", padx=8)
-        ctk.CTkLabel(bottom, text="Ctrl+1-6 to switch pages", text_color=COLORS["muted"],
+        ctk.CTkLabel(bottom, text="Ctrl+1-7 to switch pages", text_color=COLORS["muted"],
                      font=ctk.CTkFont(size=11)).pack(anchor="w", padx=8)
         ctk.CTkButton(bottom, text="Minimize to tray", height=40, fg_color=COLORS["raised"],
                        command=self.minimize_to_tray).pack(fill="x", pady=(12, 0))
@@ -135,6 +137,7 @@ class YouTubeAutomatorApp(ctk.CTk):
         self.views["folder"] = FolderView(self.content_container, on_queue_change=self._on_queue_data_changed)
         self.views["history"] = HistoryView(self.content_container)
         self.views["settings"] = SettingsView(self.content_container, on_auth_change=self.update_channel_badge)
+        self.views["download"] = DownloadView(self.content_container)
 
         self.switch_view("autopilot")
 

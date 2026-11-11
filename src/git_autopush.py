@@ -66,14 +66,14 @@ class GitAutoPushAgent:
         if res.returncode != 0:
             return []
         
-        lines = res.stdout.strip().splitlines()
+        lines = res.stdout.splitlines()
         entries = []
         for line in lines:
-            line = line.strip()
-            if len(line) >= 3:
-                status_code = line[:2].strip()
+            if len(line) >= 4:
+                status_code = line[:2]
                 file_rel = line[3:].strip().strip('"')
-                entries.append((status_code, file_rel))
+                if file_rel:
+                    entries.append((status_code, file_rel))
         return entries
 
     def push_pending_changes(self):
@@ -105,7 +105,7 @@ class GitAutoPushAgent:
                 run_git(["reset", "HEAD", staged])
 
         # Verify there are still staged files to commit
-        diff_final = run_git(["diff", "--cached", "--name-only"]).stdout.splitlines()
+        diff_final = [f.strip() for f in run_git(["diff", "--cached", "--name-only"]).stdout.splitlines() if f.strip()]
         if not diff_final:
             return False
 
